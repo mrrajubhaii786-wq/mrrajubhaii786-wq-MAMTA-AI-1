@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A message exchanged in a chat session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "model"] },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "pageSource": { "type": "string" }
+      },
+      "required": ["id", "sessionId", "role", "content", "timestamp", "pageSource"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "A log entry of user actions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "type": "string" },
+        "page": { "type": "string", "enum": ["home", "workspace", "admin", "safedrop"] },
+        "userSession": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "action", "page", "userSession", "details", "timestamp"]
+    },
+    "WikiEntry": {
+      "title": "WikiEntry",
+      "description": "An entry in the OpenWiki knowledge base",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "tags": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "content", "tags", "createdAt"]
+    },
+    "VaultItem": {
+      "title": "VaultItem",
+      "description": "An encrypted credential stored in the SafeDrop Vault",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "keyName": { "type": "string" },
+        "encryptedValue": { "type": "string" },
+        "itemType": { "type": "string", "enum": ["api_key", "password", "token", "secret", "note"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "keyName", "encryptedValue", "itemType", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/chats/{chatId}": {
+      "schema": "ChatMessage",
+      "description": "Collection of chat messages"
+    },
+    "/logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Collection of system and user logs"
+    },
+    "/wiki/{wikiId}": {
+      "schema": "WikiEntry",
+      "description": "Collection of Wiki knowledge base articles"
+    },
+    "/vault/{vaultId}": {
+      "schema": "VaultItem",
+      "description": "Collection of encrypted credentials"
+    }
+  }
+}

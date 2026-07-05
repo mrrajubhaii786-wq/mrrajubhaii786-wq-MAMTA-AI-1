@@ -20,9 +20,637 @@ import {
   encryptValue,
   readDb
 } from './src/db/fileDb';
+import { initializeApp as initClientApp, getApps as getClientApps } from 'firebase/app';
+import { 
+  getFirestore as getClientFirestore, 
+  collection, 
+  doc, 
+  getDocs, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  writeBatch 
+} from 'firebase/firestore';
+import firebaseConfig from './firebase-applet-config.json' with { type: 'json' };
+import { db as pgDb } from './src/db/index';
+import { users as pgUsers, plans as pgPlans, tasks as pgTasks, builds as pgBuilds } from './src/db/schema';
+import { eq } from 'drizzle-orm';
+import { ChatMessage, MasterPlan, ProjectTask, VaultItem, WikiEntry, ActivityLog } from './src/types';
 
 const app = express();
 const PORT = 3000;
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: null,
+      email: null,
+      emailVerified: null,
+      isAnonymous: null,
+      tenantId: null,
+      providerInfo: []
+    },
+    operationType,
+    path
+  };
+  const stringified = JSON.stringify(errInfo);
+  console.error('Firestore Error: ', stringified);
+  throw new Error(stringified);
+}
+
+class AdminDocWrapper {
+  constructor(private db: any, private colName: string, private docId: string) {}
+
+  get ref() {
+    return doc(this.db, this.colName, this.docId);
+  }
+
+  async set(data: any) {
+    await setDoc(this.ref, data);
+  }
+
+  async update(data: any) {
+    await updateDoc(this.ref, data);
+  }
+
+  async delete() {
+    await deleteDoc(this.ref);
+  }
+}
+
+class AdminQueryWrapper {
+  private constraints: any[] = [];
+  constructor(private db: any, private colName: string) {}
+
+  orderBy(field: string, direction: 'asc' | 'desc' = 'asc') {
+    this.constraints.push(orderBy(field, direction));
+    return this;
+  }
+
+  where(field: string, op: any, val: any) {
+    this.constraints.push(where(field, op, val));
+    return this;
+  }
+
+  limit(num: number) {
+    this.constraints.push(limit(num));
+    return this;
+  }
+
+  async get() {
+    const q = query(collection(this.db, this.colName), ...this.constraints);
+    const snapshot = await getDocs(q);
+    const docs = snapshot.docs.map(d => ({
+      id: d.id,
+      ref: d.ref,
+      data: () => d.data()
+    }));
+    return {
+      docs,
+      forEach: (cb: (doc: any) => void) => docs.forEach(cb),
+      empty: snapshot.empty,
+      size: snapshot.size
+    };
+  }
+}
+
+class AdminCollectionWrapper {
+  constructor(private db: any, private colName: string) {}
+
+  doc(id: string) {
+    return new AdminDocWrapper(this.db, this.colName, id);
+  }
+
+  orderBy(field: string, direction: 'asc' | 'desc' = 'asc') {
+    return new AdminQueryWrapper(this.db, this.colName).orderBy(field, direction);
+  }
+
+  where(field: string, op: any, val: any) {
+    return new AdminQueryWrapper(this.db, this.colName).where(field, op, val);
+  }
+}
+
+class AdminBatchWrapper {
+  private batch: any;
+  constructor(db: any) {
+    this.batch = writeBatch(db);
+  }
+
+  delete(docRef: any) {
+    this.batch.delete(docRef);
+    return this;
+  }
+
+  set(docRef: any, data: any) {
+    this.batch.set(docRef, data);
+    return this;
+  }
+
+  update(docRef: any, data: any) {
+    this.batch.update(docRef, data);
+    return this;
+  }
+
+  async commit() {
+    await this.batch.commit();
+  }
+}
+
+// Initialize dbAdmin using the custom Client-SDK wrapper
+let dbAdmin: any = null;
+try {
+  let clientApp;
+  if (getClientApps().length === 0) {
+    clientApp = initClientApp(firebaseConfig);
+  } else {
+    clientApp = getClientApps()[0];
+  }
+  const clientDb = getClientFirestore(clientApp, firebaseConfig.firestoreDatabaseId);
+  dbAdmin = {
+    collection(colName: string) {
+      return new AdminCollectionWrapper(clientDb, colName);
+    },
+    batch() {
+      return new AdminBatchWrapper(clientDb);
+    }
+  };
+  console.log('Firebase Client SDK initialized successfully on backend with database:', firebaseConfig.firestoreDatabaseId);
+} catch (err) {
+  console.error('Firebase Client SDK on server skipped or failed (local memory fallback active):', err);
+}
+
+// ----------------------------------------------------
+// HYBRID DATABASES (FIRESTORE & POSTGRESQL WRAPPERS)
+// ----------------------------------------------------
+
+// 1. FIRESTORE: Chats collection with fallback
+const firestoreChats = {
+  async getChats(sessionId?: string): Promise<ChatMessage[]> {
+    if (!dbAdmin) return dbChats.getChats(sessionId);
+    try {
+      let q = dbAdmin.collection('chats').orderBy('timestamp', 'asc');
+      if (sessionId) {
+        q = q.where('sessionId', '==', sessionId);
+      }
+      const snapshot = await q.get();
+      const list: ChatMessage[] = [];
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        list.push({
+          id: doc.id,
+          sessionId: d.sessionId,
+          role: d.role,
+          content: d.content,
+          timestamp: d.timestamp,
+          pageSource: d.pageSource
+        });
+      });
+      return list;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, 'chats');
+    }
+  },
+  async addChat(chat: { sessionId: string; role: 'user' | 'model'; content: string; pageSource: string }): Promise<ChatMessage> {
+    const id = 'chat_' + Math.random().toString(36).substring(2, 11);
+    const newChat: ChatMessage = {
+      id,
+      ...chat,
+      timestamp: new Date().toISOString()
+    };
+    dbChats.addChat(newChat); // dual write to sync in-memory
+    if (dbAdmin) {
+      try {
+        await dbAdmin.collection('chats').doc(id).set({
+          sessionId: chat.sessionId,
+          role: chat.role,
+          content: chat.content,
+          pageSource: chat.pageSource,
+          timestamp: newChat.timestamp
+        });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, 'chats');
+      }
+    }
+    return newChat;
+  },
+  async clearChats(sessionId?: string): Promise<void> {
+    dbChats.clearChats(sessionId);
+    if (dbAdmin) {
+      try {
+        const coll = dbAdmin.collection('chats');
+        let q: any = coll;
+        if (sessionId) {
+          q = q.where('sessionId', '==', sessionId);
+        }
+        const snapshot = await q.get();
+        const batch = dbAdmin.batch();
+        snapshot.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, 'chats');
+      }
+    }
+  }
+};
+
+// 2. FIRESTORE: logs with fallback
+const firestoreLogs = {
+  async getActivityLogs(): Promise<ActivityLog[]> {
+    if (!dbAdmin) return dbLogs.getActivityLogs();
+    try {
+      const snapshot = await dbAdmin.collection('logs').orderBy('timestamp', 'desc').limit(100).get();
+      const list: ActivityLog[] = [];
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        list.push({
+          id: doc.id,
+          action: d.action,
+          page: d.page,
+          userSession: d.userSession,
+          details: d.details,
+          timestamp: d.timestamp
+        });
+      });
+      return list;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, 'logs');
+    }
+  },
+  async addActivityLog(log: Omit<ActivityLog, 'id' | 'timestamp'>): Promise<ActivityLog> {
+    const id = 'log_' + Math.random().toString(36).substring(2, 11);
+    const newLog: ActivityLog = {
+      id,
+      ...log,
+      timestamp: new Date().toISOString()
+    };
+    dbLogs.addActivityLog(newLog);
+    if (dbAdmin) {
+      try {
+        await dbAdmin.collection('logs').doc(id).set({
+          action: log.action,
+          page: log.page,
+          userSession: log.userSession,
+          details: log.details,
+          timestamp: newLog.timestamp
+        });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, 'logs');
+      }
+    }
+    return newLog;
+  },
+  getAiCallsCount(): number {
+    return dbLogs.getAiCallsCount();
+  },
+  incrementAiCalls(): void {
+    dbLogs.incrementAiCalls();
+  }
+};
+
+// 3. FIRESTORE: wiki with fallback
+const firestoreWiki = {
+  async getEntries(): Promise<WikiEntry[]> {
+    if (!dbAdmin) return dbWiki.getEntries();
+    try {
+      const snapshot = await dbAdmin.collection('wiki').orderBy('createdAt', 'desc').get();
+      const list: WikiEntry[] = [];
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        list.push({
+          id: doc.id,
+          title: d.title,
+          content: d.content,
+          tags: d.tags || [],
+          createdAt: d.createdAt
+        });
+      });
+      return list;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, 'wiki');
+    }
+  },
+  async addEntry(title: string, content: string, tags: string[]): Promise<WikiEntry> {
+    const id = 'wiki_' + Math.random().toString(36).substring(2, 11);
+    const newEntry: WikiEntry = {
+      id,
+      title,
+      content,
+      tags,
+      createdAt: new Date().toISOString()
+    };
+    dbWiki.addEntry(title, content, tags);
+    if (dbAdmin) {
+      try {
+        await dbAdmin.collection('wiki').doc(id).set({
+          title,
+          content,
+          tags,
+          createdAt: newEntry.createdAt
+        });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, 'wiki');
+      }
+    }
+    return newEntry;
+  },
+  async updateEntry(id: string, updates: { title?: string; content?: string; tags?: string[] }): Promise<WikiEntry | null> {
+    const local = dbWiki.updateEntry(id, updates);
+    if (dbAdmin) {
+      try {
+        const u: Record<string, any> = {};
+        if (updates.title !== undefined) u.title = updates.title;
+        if (updates.content !== undefined) u.content = updates.content;
+        if (updates.tags !== undefined) u.tags = updates.tags;
+        await dbAdmin.collection('wiki').doc(id).update(u);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `wiki/${id}`);
+      }
+    }
+    return local;
+  },
+  async deleteEntry(id: string): Promise<void> {
+    dbWiki.deleteEntry(id);
+    if (dbAdmin) {
+      try {
+        await dbAdmin.collection('wiki').doc(id).delete();
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `wiki/${id}`);
+      }
+    }
+  }
+};
+
+// 4. FIRESTORE: vault keys with encryption & fallback
+const firestoreVault = {
+  async getVaultItems(): Promise<VaultItem[]> {
+    if (!dbAdmin) return dbVault.getVaultItems();
+    try {
+      const snapshot = await dbAdmin.collection('vault').orderBy('createdAt', 'desc').get();
+      const list: VaultItem[] = [];
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        list.push({
+          id: doc.id,
+          keyName: d.keyName,
+          encryptedValue: d.encryptedValue,
+          itemType: d.itemType,
+          createdAt: d.createdAt
+        });
+      });
+      return list;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, 'vault');
+    }
+  },
+  async addVaultItem(keyName: string, value: string, itemType: VaultItem['itemType'], masterPassword: string): Promise<VaultItem> {
+    const id = 'vault_' + Math.random().toString(36).substring(2, 11);
+    const encrypted = encryptValue(value, masterPassword);
+    const newItem: VaultItem = {
+      id,
+      keyName,
+      encryptedValue: encrypted,
+      itemType,
+      createdAt: new Date().toISOString()
+    };
+    dbVault.addVaultItem(keyName, value, itemType, masterPassword);
+    if (dbAdmin) {
+      try {
+        await dbAdmin.collection('vault').doc(id).set({
+          keyName,
+          encryptedValue: encrypted,
+          itemType,
+          createdAt: newItem.createdAt
+        });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, 'vault');
+      }
+    }
+    return newItem;
+  },
+  async deleteVaultItem(id: string): Promise<void> {
+    dbVault.deleteVaultItem(id);
+    if (dbAdmin) {
+      try {
+        await dbAdmin.collection('vault').doc(id).delete();
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `vault/${id}`);
+      }
+    }
+  }
+};
+
+// 5. CLOUD SQL: Plans wrapper with safety and fileDb dual write
+const sqlPlans = {
+  async getPlans(): Promise<MasterPlan[]> {
+    try {
+      const results = await pgDb.select().from(pgPlans);
+      if (results.length === 0) return dbPlans.getPlans();
+      return results.map(r => ({
+        id: String(r.id),
+        title: r.title,
+        content: r.goal,
+        status: (r.status as any) || 'pending',
+        createdAt: r.createdAt.toISOString()
+      }));
+    } catch (err) {
+      console.warn('Cloud SQL select plans failed, returning local:', err);
+      return dbPlans.getPlans();
+    }
+  },
+  async getPlan(id: string): Promise<MasterPlan | null> {
+    try {
+      const results = await pgDb.select().from(pgPlans).where(eq(pgPlans.id, Number(id)));
+      if (results.length === 0) return dbPlans.getPlan(id);
+      const r = results[0];
+      return {
+        id: String(r.id),
+        title: r.title,
+        content: r.goal,
+        status: (r.status as any) || 'pending',
+        createdAt: r.createdAt.toISOString()
+      };
+    } catch (err) {
+      console.warn('Cloud SQL getPlan failed:', err);
+      return dbPlans.getPlan(id);
+    }
+  },
+  async addPlan(title: string, goal: string): Promise<MasterPlan> {
+    const local = dbPlans.addPlan(title, goal);
+    try {
+      // Satisfy foreign key user constraint
+      let userId = 1;
+      try {
+        const u = await pgDb.select().from(pgUsers).limit(1);
+        if (u.length === 0) {
+          const insertedUser = await pgDb.insert(pgUsers).values({
+            uid: 'system_default_uid',
+            email: 'admin@mamta.ai',
+            role: 'admin'
+          }).returning();
+          userId = insertedUser[0].id;
+        } else {
+          userId = u[0].id;
+        }
+      } catch (err) {
+        console.warn('PG Users initialization skipped:', err);
+      }
+
+      const inserted = await pgDb.insert(pgPlans).values({
+        userId,
+        title,
+        goal,
+        status: 'draft'
+      }).returning();
+
+      if (inserted.length > 0) {
+        const p = inserted[0];
+        // Mirror id to keep local in sync if needed
+        return {
+          id: String(p.id),
+          title: p.title,
+          content: p.goal,
+          status: 'pending',
+          createdAt: p.createdAt.toISOString()
+        };
+      }
+    } catch (err) {
+      console.warn('Cloud SQL insert plan failed, using local fallback:', err);
+    }
+    return local;
+  },
+  async updatePlan(id: string, updates: { status?: 'pending' | 'in_progress' | 'completed' | 'failed'; completedAt?: string }): Promise<void> {
+    dbPlans.updatePlan(id, updates);
+    try {
+      const u: Record<string, any> = {};
+      if (updates.status) u.status = updates.status;
+      await pgDb.update(pgPlans).set(u).where(eq(pgPlans.id, Number(id)));
+    } catch (err) {
+      console.warn('Cloud SQL updatePlan failed:', err);
+    }
+  }
+};
+
+// 6. CLOUD SQL: Tasks wrapper with safety, fileDb write, and Firestore realtime mirror
+const sqlTasks = {
+  async getTasks(planId: string): Promise<ProjectTask[]> {
+    try {
+      const results = await pgDb.select().from(pgTasks).where(eq(pgTasks.planId, Number(planId)));
+      if (results.length === 0) return dbTasks.getTasks(planId);
+      return results.map(r => ({
+        id: String(r.id),
+        planId: String(r.planId),
+        title: r.name,
+        description: 'Build component task',
+        status: (r.status as any) || 'pending',
+        order: 0,
+        createdAt: r.createdAt.toISOString()
+      }));
+    } catch (err) {
+      console.warn('Cloud SQL select tasks failed:', err);
+      return dbTasks.getTasks(planId);
+    }
+  },
+  async addTasks(taskList: Omit<ProjectTask, 'id' | 'createdAt'>[]): Promise<ProjectTask[]> {
+    const local = dbTasks.addTasks(taskList);
+    try {
+      const insertedList: ProjectTask[] = [];
+      for (const t of taskList) {
+        const inserted = await pgDb.insert(pgTasks).values({
+          planId: Number(t.planId),
+          name: t.title,
+          status: 'todo',
+          priority: 'medium'
+        }).returning();
+
+        if (inserted.length > 0) {
+          const resTask: ProjectTask = {
+            id: String(inserted[0].id),
+            planId: String(inserted[0].planId),
+            title: inserted[0].name,
+            description: t.description,
+            status: 'pending',
+            order: t.order,
+            createdAt: inserted[0].createdAt.toISOString()
+          };
+          insertedList.push(resTask);
+
+          // Push to Firestore tasks collection for real-time snapshots (Phase 9)
+          if (dbAdmin) {
+            try {
+              await dbAdmin.collection('tasks').doc(resTask.id).set({
+                planId: resTask.planId,
+                title: resTask.title,
+                description: resTask.description,
+                status: resTask.status,
+                order: resTask.order,
+                createdAt: resTask.createdAt
+              });
+            } catch (fsErr) {
+              handleFirestoreError(fsErr, OperationType.WRITE, 'tasks');
+            }
+          }
+        }
+      }
+      return insertedList;
+    } catch (err) {
+      console.warn('Cloud SQL insert tasks failed, using local fallback:', err);
+    }
+    return local;
+  },
+  async updateTaskStatus(id: string, status: ProjectTask['status'], completedAt?: string): Promise<void> {
+    dbTasks.updateTaskStatus(id, status, completedAt);
+    try {
+      await pgDb.update(pgTasks).set({ status }).where(eq(pgTasks.id, Number(id)));
+    } catch (err) {
+      console.warn('Cloud SQL updateTaskStatus failed:', err);
+    }
+
+    // Mirror update to Firestore tasks collection for real-time snapshots (Phase 9)
+    if (dbAdmin) {
+      try {
+        await dbAdmin.collection('tasks').doc(id).update({ status });
+      } catch (fsErr) {
+        handleFirestoreError(fsErr, OperationType.UPDATE, `tasks/${id}`);
+      }
+    }
+  },
+  clearTasks(planId: string): void {
+    dbTasks.clearTasks(planId);
+    // Remove tasks from Firestore if desired, or skip
+  }
+};
+
 
 app.use(express.json());
 
@@ -63,10 +691,10 @@ app.get('/api/health', (req, res) => {
 });
 
 // Chats Endpoints
-app.get('/api/chats', (req, res) => {
+app.get('/api/chats', async (req, res) => {
   const { sessionId } = req.query;
   try {
-    const chats = dbChats.getChats(sessionId ? String(sessionId) : undefined);
+    const chats = await firestoreChats.getChats(sessionId ? String(sessionId) : undefined);
     res.json(chats);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -81,14 +709,14 @@ app.post('/api/chats', async (req, res) => {
 
   try {
     // Add User Message
-    const userMsg = dbChats.addChat({
+    const userMsg = await firestoreChats.addChat({
       sessionId,
       role: 'user',
       content,
       pageSource: pageSource || 'home'
     });
 
-    dbLogs.addActivityLog({
+    await firestoreLogs.addActivityLog({
       action: 'Send Chat Message',
       page: 'home',
       userSession: sessionId,
@@ -98,7 +726,7 @@ app.post('/api/chats', async (req, res) => {
     // Check for explicit wiki command /wiki
     if (content.startsWith('/wiki ')) {
       const query = content.substring(6).trim().toLowerCase();
-      const wikiEntries = dbWiki.getEntries();
+      const wikiEntries = await firestoreWiki.getEntries();
       const match = wikiEntries.find(
         e => e.title.toLowerCase().includes(query) || e.content.toLowerCase().includes(query)
       );
@@ -110,7 +738,7 @@ app.post('/api/chats', async (req, res) => {
         modelReply = `❌ No OpenWiki entries found matching "${query}". You can add or search entries in the **Admin Dashboard > OpenWiki** panel.`;
       }
 
-      const modelMsg = dbChats.addChat({
+      const modelMsg = await firestoreChats.addChat({
         sessionId,
         role: 'model',
         content: modelReply,
@@ -122,9 +750,9 @@ app.post('/api/chats', async (req, res) => {
 
     // Call Gemini for general chat
     const client = getGeminiClient();
-    trackAiCall();
+    firestoreLogs.incrementAiCalls();
 
-    const systemPrompt = `You are MAMTA AI (v7.0), an autonomous full-stack AI development assistant.
+    const systemPrompt = `You are MAMTA AI (v7.2), an autonomous full-stack AI development assistant.
 You respond in a friendly, highly professional, objective, and bilingual manner, speaking both English and Hindi naturally depending on context (e.g. incorporating words like "Swagat hai", "bilkul", "Zaroor", "aapka plan").
 Keep your responses beautifully structured in clear markdown with clean headings, readable bullet points, and elegant typography.
 
@@ -140,7 +768,7 @@ You are the brain of the MAMTA AI platform, which includes:
 - Use simple literal wording. Avoid low-quality AI-slop or infrastructure telemetry noise.`;
 
     // Retrieve conversation history
-    const history = dbChats.getChats(sessionId).slice(-8); // Get last 8 messages for context
+    const history = (await firestoreChats.getChats(sessionId)).slice(-8); // Get last 8 messages for context
     const contents = history.map(msg => ({
       role: msg.role === 'model' ? 'model' : 'user',
       parts: [{ text: msg.content }]
@@ -174,7 +802,7 @@ You are the brain of the MAMTA AI platform, which includes:
       lowercasePrompt.includes('code');
 
     // Add Model Response
-    const modelMsg = dbChats.addChat({
+    const modelMsg = await firestoreChats.addChat({
       sessionId,
       role: 'model',
       content: aiText,
@@ -194,10 +822,10 @@ You are the brain of the MAMTA AI platform, which includes:
   }
 });
 
-app.post('/api/chats/clear', (req, res) => {
+app.post('/api/chats/clear', async (req, res) => {
   const { sessionId } = req.body;
   try {
-    dbChats.clearChats(sessionId ? String(sessionId) : undefined);
+    await firestoreChats.clearChats(sessionId ? String(sessionId) : undefined);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -205,17 +833,18 @@ app.post('/api/chats/clear', (req, res) => {
 });
 
 // Master Plans Endpoints
-app.get('/api/plans', (req, res) => {
+app.get('/api/plans', async (req, res) => {
   try {
-    res.json(dbPlans.getPlans());
+    const plans = await sqlPlans.getPlans();
+    res.json(plans);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/plans/:id', (req, res) => {
+app.get('/api/plans/:id', async (req, res) => {
   try {
-    const plan = dbPlans.getPlan(req.params.id);
+    const plan = await sqlPlans.getPlan(req.params.id);
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
     res.json(plan);
   } catch (err: any) {
@@ -229,9 +858,9 @@ app.post('/api/plans/generate', async (req, res) => {
 
   try {
     const client = getGeminiClient();
-    trackAiCall();
+    firestoreLogs.incrementAiCalls();
 
-    dbLogs.addActivityLog({
+    await firestoreLogs.addActivityLog({
       action: 'Generate Master Plan',
       page: 'home',
       userSession: sessionId || 'ANON',
@@ -272,7 +901,7 @@ Ensure the breakdown uses clear headings for tasks so that they can be easily pa
       if (match) title = match[1].trim();
     }
 
-    const savedPlan = dbPlans.addPlan(title, planMarkdown);
+    const savedPlan = await sqlPlans.addPlan(title, planMarkdown);
 
     res.json(savedPlan);
   } catch (err: any) {
@@ -282,9 +911,10 @@ Ensure the breakdown uses clear headings for tasks so that they can be easily pa
 });
 
 // Tasks Endpoints
-app.get('/api/plans/:id/tasks', (req, res) => {
+app.get('/api/plans/:id/tasks', async (req, res) => {
   try {
-    res.json(dbTasks.getTasks(req.params.id));
+    const tasks = await sqlTasks.getTasks(req.params.id);
+    res.json(tasks);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -295,10 +925,10 @@ app.post('/api/plans/:id/analyze', async (req, res) => {
   const { sessionId } = req.body;
 
   try {
-    const plan = dbPlans.getPlan(planId);
+    const plan = await sqlPlans.getPlan(planId);
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
 
-    dbLogs.addActivityLog({
+    await firestoreLogs.addActivityLog({
       action: 'Analyze Plan Tasks',
       page: 'workspace',
       userSession: sessionId || 'ANON',
@@ -306,10 +936,10 @@ app.post('/api/plans/:id/analyze', async (req, res) => {
     });
 
     // We clear current tasks first to allow re-analysis
-    dbTasks.clearTasks(planId);
+    sqlTasks.clearTasks(planId);
 
     const client = getGeminiClient();
-    trackAiCall();
+    firestoreLogs.incrementAiCalls();
 
     const prompt = `You are MAMTA AI's task formulation engine. 
 Review the following Master Plan and decompose it into a strict JSON list of 5 to 10 sequential, practical tasks that can be individually generated and coded.
@@ -340,7 +970,7 @@ Do not return any markdown code block wraps (\`\`\`json) or other text surroundi
 
     let rawJson = (response.text || '[]').trim();
     
-    // Fallback parsing just in case it wrapper it in markdown
+    // Fallback parsing just in case it wrapped it in markdown
     if (rawJson.startsWith('```json')) {
       rawJson = rawJson.replace(/```json\s*/, '').replace(/\s*```$/, '');
     } else if (rawJson.startsWith('```')) {
@@ -360,8 +990,8 @@ Do not return any markdown code block wraps (\`\`\`json) or other text surroundi
       order: index
     }));
 
-    const insertedTasks = dbTasks.addTasks(tasksToInsert);
-    dbPlans.updatePlan(planId, { status: 'in_progress' });
+    const insertedTasks = await sqlTasks.addTasks(tasksToInsert);
+    await sqlPlans.updatePlan(planId, { status: 'in_progress' });
 
     res.json(insertedTasks);
   } catch (err: any) {
@@ -376,17 +1006,17 @@ app.post('/api/plans/:planId/tasks/:taskId/build', async (req, res) => {
   const { sessionId } = req.body;
 
   try {
-    const plan = dbPlans.getPlan(planId);
+    const plan = await sqlPlans.getPlan(planId);
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
 
-    const tasks = dbTasks.getTasks(planId);
+    const tasks = await sqlTasks.getTasks(planId);
     const targetTask = tasks.find(t => t.id === taskId);
     if (!targetTask) return res.status(404).json({ error: 'Task not found' });
 
     // Mark task as running
-    dbTasks.updateTaskStatus(taskId, 'running');
+    await sqlTasks.updateTaskStatus(taskId, 'running');
 
-    dbLogs.addActivityLog({
+    await firestoreLogs.addActivityLog({
       action: 'Build Code Task',
       page: 'workspace',
       userSession: sessionId || 'ANON',
@@ -405,7 +1035,7 @@ app.post('/api/plans/:planId/tasks/:taskId/build', async (req, res) => {
     }).join('\n\n');
 
     const client = getGeminiClient();
-    trackAiCall();
+    firestoreLogs.incrementAiCalls();
 
     const prompt = `You are MAMTA AI's Master Builder Engine. Your job is to generate functional, production-ready source files that fulfill the current task inside the project: "${plan.title}".
 
@@ -480,13 +1110,13 @@ Do not return any markdown wraps or wrapper text. Return only the raw JSON.`;
     logs.push(`[SUCCESS] Task "${targetTask.title}" compiled successfully.`);
 
     // Mark task as completed
-    dbTasks.updateTaskStatus(taskId, 'completed', new Date().toISOString());
+    await sqlTasks.updateTaskStatus(taskId, 'completed', new Date().toISOString());
 
     // Check if all tasks for this plan are completed
-    const updatedTasks = dbTasks.getTasks(planId);
+    const updatedTasks = await sqlTasks.getTasks(planId);
     const allCompleted = updatedTasks.every(t => t.status === 'completed');
     if (allCompleted) {
-      dbPlans.updatePlan(planId, { status: 'completed', completedAt: new Date().toISOString() });
+      await sqlPlans.updatePlan(planId, { status: 'completed', completedAt: new Date().toISOString() });
       logs.push(`[SYSTEM] All project builds completed! Master plan fully executed.`);
     }
 
@@ -498,7 +1128,7 @@ Do not return any markdown wraps or wrapper text. Return only the raw JSON.`;
 
   } catch (err: any) {
     console.error('Build task error:', err);
-    dbTasks.updateTaskStatus(taskId, 'failed');
+    await sqlTasks.updateTaskStatus(taskId, 'failed');
     res.status(500).json({ error: err.message });
   }
 });
@@ -527,7 +1157,7 @@ app.get('/api/workspace/files/:projectId/read', (req, res) => {
   }
 });
 
-app.post('/api/workspace/files/:projectId/save', (req, res) => {
+app.post('/api/workspace/files/:projectId/save', async (req, res) => {
   const { projectId } = req.params;
   const { fileName, content, sessionId } = req.body;
   if (!fileName || content === undefined) {
@@ -536,7 +1166,7 @@ app.post('/api/workspace/files/:projectId/save', (req, res) => {
 
   try {
     dbFiles.saveFile(projectId, fileName, content);
-    dbLogs.addActivityLog({
+    await firestoreLogs.addActivityLog({
       action: 'Save File Manually',
       page: 'workspace',
       userSession: sessionId || 'ANON',
@@ -548,14 +1178,14 @@ app.post('/api/workspace/files/:projectId/save', (req, res) => {
   }
 });
 
-app.post('/api/workspace/files/:projectId/delete', (req, res) => {
+app.post('/api/workspace/files/:projectId/delete', async (req, res) => {
   const { projectId } = req.params;
   const { fileName, sessionId } = req.body;
   if (!fileName) return res.status(400).json({ error: 'fileName is required' });
 
   try {
     dbFiles.deleteFile(projectId, fileName);
-    dbLogs.addActivityLog({
+    await firestoreLogs.addActivityLog({
       action: 'Delete File',
       page: 'workspace',
       userSession: sessionId || 'ANON',
@@ -568,23 +1198,24 @@ app.post('/api/workspace/files/:projectId/delete', (req, res) => {
 });
 
 // SafeDrop Vault Endpoints
-app.get('/api/vault', (req, res) => {
+app.get('/api/vault', async (req, res) => {
   try {
-    res.json(dbVault.getVaultItems());
+    const items = await firestoreVault.getVaultItems();
+    res.json(items);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/vault/store', (req, res) => {
+app.post('/api/vault/store', async (req, res) => {
   const { keyName, value, itemType, masterPassword, sessionId } = req.body;
   if (!keyName || !value || !itemType || !masterPassword) {
     return res.status(400).json({ error: 'keyName, value, itemType, and masterPassword are required' });
   }
 
   try {
-    const newItem = dbVault.addVaultItem(keyName, value, itemType, masterPassword);
-    dbLogs.addActivityLog({
+    const newItem = await firestoreVault.addVaultItem(keyName, value, itemType, masterPassword);
+    await firestoreLogs.addActivityLog({
       action: 'Store Vault Item',
       page: 'safedrop',
       userSession: sessionId || 'ANON',
@@ -596,20 +1227,20 @@ app.post('/api/vault/store', (req, res) => {
   }
 });
 
-app.post('/api/vault/retrieve', (req, res) => {
+app.post('/api/vault/retrieve', async (req, res) => {
   const { id, masterPassword, sessionId } = req.body;
   if (!id || !masterPassword) {
     return res.status(400).json({ error: 'id and masterPassword are required' });
   }
 
   try {
-    const items = readDb().vaultItems;
+    const items = await firestoreVault.getVaultItems();
     const match = items.find(item => item.id === id);
     if (!match) return res.status(404).json({ error: 'Vault item not found' });
 
     const decrypted = decryptValue(match.encryptedValue, masterPassword);
 
-    dbLogs.addActivityLog({
+    await firestoreLogs.addActivityLog({
       action: 'Decrypt Vault Item',
       page: 'safedrop',
       userSession: sessionId || 'ANON',
@@ -622,12 +1253,12 @@ app.post('/api/vault/retrieve', (req, res) => {
   }
 });
 
-app.delete('/api/vault/:id', (req, res) => {
+app.delete('/api/vault/:id', async (req, res) => {
   const { id } = req.params;
   const { sessionId } = req.body;
   try {
-    dbVault.deleteVaultItem(id);
-    dbLogs.addActivityLog({
+    await firestoreVault.deleteVaultItem(id);
+    await firestoreLogs.addActivityLog({
       action: 'Delete Vault Item',
       page: 'safedrop',
       userSession: sessionId || 'ANON',
@@ -640,16 +1271,14 @@ app.delete('/api/vault/:id', (req, res) => {
 });
 
 // Admin Metrics
-app.get('/api/admin/metrics', (req, res) => {
+app.get('/api/admin/metrics', async (req, res) => {
   try {
-    const db = readDb();
+    const activeChats = await firestoreChats.getChats();
+    const distinctSessions = new Set(activeChats.map(c => c.sessionId));
     
-    // Distinct sessions count
-    const distinctSessions = new Set(db.chats.map(c => c.sessionId));
-    
-    // Success rate calculation based on completed tasks/plans
-    const totalPlans = db.plans.length;
-    const completedPlans = db.plans.filter(p => p.status === 'completed').length;
+    const activePlans = await sqlPlans.getPlans();
+    const totalPlans = activePlans.length;
+    const completedPlans = activePlans.filter(p => p.status === 'completed').length;
     const successRate = totalPlans > 0 ? Math.round((completedPlans / totalPlans) * 100) : 100;
 
     // Direct process info
@@ -674,7 +1303,7 @@ app.get('/api/admin/metrics', (req, res) => {
       },
       dbConnected: true,
       uptime: uptimeSec,
-      aiCallsToday: dbLogs.getAiCallsCount(),
+      aiCallsToday: firestoreLogs.getAiCallsCount(),
       activeSessions: distinctSessions.size || 1,
       plansGenerated: totalPlans,
       successRate
@@ -685,30 +1314,32 @@ app.get('/api/admin/metrics', (req, res) => {
 });
 
 // Logs Endpoint
-app.get('/api/admin/logs', (req, res) => {
+app.get('/api/admin/logs', async (req, res) => {
   try {
-    res.json(dbLogs.getActivityLogs());
+    const logs = await firestoreLogs.getActivityLogs();
+    res.json(logs);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // Wiki Endpoints
-app.get('/api/admin/wiki', (req, res) => {
+app.get('/api/admin/wiki', async (req, res) => {
   try {
-    res.json(dbWiki.getEntries());
+    const entries = await firestoreWiki.getEntries();
+    res.json(entries);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/admin/wiki', (req, res) => {
+app.post('/api/admin/wiki', async (req, res) => {
   const { title, content, tags, sessionId } = req.body;
   if (!title || !content) return res.status(400).json({ error: 'title and content are required' });
 
   try {
-    const entry = dbWiki.addEntry(title, content, tags || []);
-    dbLogs.addActivityLog({
+    const entry = await firestoreWiki.addEntry(title, content, tags || []);
+    await firestoreLogs.addActivityLog({
       action: 'Create Wiki Entry',
       page: 'admin',
       userSession: sessionId || 'SYSTEM',
@@ -720,15 +1351,15 @@ app.post('/api/admin/wiki', (req, res) => {
   }
 });
 
-app.put('/api/admin/wiki/:id', (req, res) => {
+app.put('/api/admin/wiki/:id', async (req, res) => {
   const { id } = req.params;
   const { title, content, tags, sessionId } = req.body;
 
   try {
-    const entry = dbWiki.updateEntry(id, { title, content, tags });
+    const entry = await firestoreWiki.updateEntry(id, { title, content, tags });
     if (!entry) return res.status(404).json({ error: 'Entry not found' });
 
-    dbLogs.addActivityLog({
+    await firestoreLogs.addActivityLog({
       action: 'Update Wiki Entry',
       page: 'admin',
       userSession: sessionId || 'SYSTEM',
@@ -740,12 +1371,12 @@ app.put('/api/admin/wiki/:id', (req, res) => {
   }
 });
 
-app.delete('/api/admin/wiki/:id', (req, res) => {
+app.delete('/api/admin/wiki/:id', async (req, res) => {
   const { id } = req.params;
   const { sessionId } = req.body;
   try {
-    dbWiki.deleteEntry(id);
-    dbLogs.addActivityLog({
+    await firestoreWiki.deleteEntry(id);
+    await firestoreLogs.addActivityLog({
       action: 'Delete Wiki Entry',
       page: 'admin',
       userSession: sessionId || 'SYSTEM',
@@ -768,13 +1399,13 @@ app.get('/api/settings/config', (req, res) => {
   });
 });
 
-app.post('/api/settings/config', (req, res) => {
+app.post('/api/settings/config', async (req, res) => {
   const { model, sessionId } = req.body;
   if (!model) return res.status(400).json({ error: 'model selection is required' });
 
   try {
     currentModelSelection = model;
-    dbLogs.addActivityLog({
+    await firestoreLogs.addActivityLog({
       action: 'Modify Model Configuration',
       page: 'admin',
       userSession: sessionId || 'SYSTEM',

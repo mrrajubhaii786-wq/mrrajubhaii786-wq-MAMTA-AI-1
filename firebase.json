@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-mamtaai-6b016f9d-0d42-4d7f-bef0-f1b6ad92a243",
+      "rules": "firestore.rules"
+    }
+  ]
+}

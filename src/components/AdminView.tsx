@@ -260,12 +260,12 @@ export default function AdminView({ sessionId }: AdminViewProps) {
                 <div>
                   <div className="flex justify-between text-[11px] text-slate-400 mb-0.5 font-mono">
                     <span>V8 Memory Heap Usage</span>
-                    <span className="text-slate-200 font-semibold text-[11px]">{metrics?.memoryUsage.percentage || 12}% ({metrics?.memoryUsage.used || 0} MB / {metrics?.memoryUsage.total || 0} MB)</span>
+                    <span className="text-slate-200 font-semibold text-[11px]">{metrics?.memoryUsage?.percentage ?? 12}% ({metrics?.memoryUsage?.used ?? 0} MB / {metrics?.memoryUsage?.total ?? 0} MB)</span>
                   </div>
                   <div className="w-full bg-slate-850 h-1.5 rounded-full overflow-hidden">
                     <div 
                       className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full transition-all duration-300" 
-                      style={{ width: `${metrics?.memoryUsage.percentage || 12}%` }}
+                      style={{ width: `${metrics?.memoryUsage?.percentage ?? 12}%` }}
                     />
                   </div>
                 </div>
@@ -274,12 +274,12 @@ export default function AdminView({ sessionId }: AdminViewProps) {
                 <div>
                   <div className="flex justify-between text-[11px] text-slate-400 mb-0.5 font-mono">
                     <span>Sandbox Storage (Disk)</span>
-                    <span className="text-slate-200 font-semibold text-[11px]">{metrics?.diskUsage.percentage || 34}% ({metrics?.diskUsage.used || 17} GB / {metrics?.diskUsage.total || 50} GB)</span>
+                    <span className="text-slate-200 font-semibold text-[11px]">{metrics?.diskUsage?.percentage ?? 34}% ({metrics?.diskUsage?.used ?? 17} GB / {metrics?.diskUsage?.total ?? 50} GB)</span>
                   </div>
                   <div className="w-full bg-slate-850 h-1.5 rounded-full overflow-hidden">
                     <div 
                       className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full transition-all duration-300" 
-                      style={{ width: `${metrics?.diskUsage.percentage || 34}%` }}
+                      style={{ width: `${metrics?.diskUsage?.percentage ?? 34}%` }}
                     />
                   </div>
                 </div>

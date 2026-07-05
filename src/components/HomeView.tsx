@@ -259,7 +259,7 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
       <div className="w-full flex items-center justify-between border-b border-slate-900 pb-3">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
-          <span className="text-xs font-semibold tracking-wider text-slate-400 uppercase font-mono">ChatGPT Mode</span>
+          <span className="text-xs font-semibold tracking-wider text-slate-400 uppercase font-mono">MAMTA AI Core</span>
         </div>
         
         {messages.length > 0 && (
@@ -420,10 +420,6 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
             <Send className="w-3.5 h-3.5" />
           </button>
         </form>
-        
-        <p className="text-center text-[9px] text-slate-600 font-mono tracking-wide mt-2">
-          MAMTA AI v7.2 • Autonomous Bilingual OS • Powered by Google Gemini 3.5 Flash
-        </p>
       </div>
 
     </div>

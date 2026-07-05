@@ -59,7 +59,7 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan 
   const [branchName, setBranchName] = useState('main');
   const [githubToken, setGithubToken] = useState('');
 
-  const terminalEndRef = useRef<HTMLDivElement>(null);
+  const terminalContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchPlans();
@@ -72,7 +72,9 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan 
   }, [selectedPlanId]);
 
   useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (terminalContainerRef.current) {
+      terminalContainerRef.current.scrollTop = terminalContainerRef.current.scrollHeight;
+    }
   }, [consoleLogs]);
 
   const addLog = (log: string) => {
@@ -338,10 +340,10 @@ User Query: "${userText}"`;
   const completionPct = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
 
   return (
-    <div id="workspace_core_pane" className="grid grid-cols-1 xl:grid-cols-12 gap-3 h-full w-full">
+    <div id="workspace_core_pane" className="grid grid-cols-1 xl:grid-cols-12 gap-3 h-full w-full overflow-y-auto xl:overflow-hidden pb-6 xl:pb-0">
       
       {/* 1. LEFT SIDEBAR: Plan Task checklist (3 Cols) */}
-      <div className="xl:col-span-3 flex flex-col bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 backdrop-blur-md shadow-xl h-[calc(100vh-80px)] lg:h-[calc(100vh-50px)] overflow-hidden">
+      <div className="xl:col-span-3 flex flex-col bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 backdrop-blur-md shadow-xl h-[450px] xl:h-[calc(100vh-50px)] overflow-hidden">
         
         <div className="flex items-center gap-2 pb-3 border-b border-slate-800 mb-4 justify-between">
           <div className="flex items-center gap-2">
@@ -491,7 +493,7 @@ User Query: "${userText}"`;
       </div>
 
       {/* 2. CENTER PIECE: IDE Editor, File Tree & Terminal (6 Cols) */}
-      <div className="xl:col-span-6 flex flex-col h-[calc(100vh-80px)] lg:h-[calc(100vh-50px)] space-y-3 overflow-hidden">
+      <div className="xl:col-span-6 flex flex-col h-[650px] xl:h-[calc(100vh-50px)] space-y-3 overflow-hidden">
         
         {/* Editor & Explorer Split container */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-12 bg-slate-900/60 border border-slate-800/80 rounded-xl overflow-hidden backdrop-blur-md shadow-xl">
@@ -623,7 +625,7 @@ User Query: "${userText}"`;
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar leading-relaxed">
+          <div ref={terminalContainerRef} className="flex-1 overflow-y-auto space-y-1 custom-scrollbar leading-relaxed">
             {consoleLogs.map((log, i) => (
               <div 
                 key={i} 
@@ -642,14 +644,13 @@ User Query: "${userText}"`;
                 {log}
               </div>
             ))}
-            <div ref={terminalEndRef} />
           </div>
         </div>
 
       </div>
 
       {/* 3. RIGHT PANEL: IDE Conversational Assistant Core (3 Cols) */}
-      <div className="xl:col-span-3 flex flex-col bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 backdrop-blur-md shadow-xl h-[calc(100vh-80px)] lg:h-[calc(100vh-50px)] overflow-hidden">
+      <div className="xl:col-span-3 flex flex-col bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 backdrop-blur-md shadow-xl h-[450px] xl:h-[calc(100vh-50px)] overflow-hidden">
         
         <div className="flex items-center gap-2 pb-2 border-b border-slate-800 mb-3 shrink-0">
           <Sparkles className="w-4.5 h-4.5 text-emerald-400" />

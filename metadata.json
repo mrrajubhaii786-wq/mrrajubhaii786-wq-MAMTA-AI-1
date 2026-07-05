@@ -1,0 +1,6 @@
+{
+  "name": "MAMTA AI",
+  "description": "A powerful full-stack autonomous AI platform powered by Google AI Studio (Gemini) featuring an intelligent Home Chat, Workspace IDE, Admin Dashboard, and SafeDrop security vault.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

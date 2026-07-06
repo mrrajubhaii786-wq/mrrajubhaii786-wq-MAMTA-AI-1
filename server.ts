@@ -762,7 +762,17 @@ async function generateContentWithRetry(
 
 // Health Check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    time: new Date().toISOString(),
+    env_diagnostics: {
+      gemini_api_key_configured: !!process.env.GEMINI_API_KEY,
+      firebase_api_key_configured: !!process.env.FIREBASE_API_KEY,
+      firebase_project_id_configured: !!process.env.FIREBASE_PROJECT_ID,
+      firebase_app_id_configured: !!process.env.FIREBASE_APP_ID,
+      is_vercel_environment: process.env.VERCEL === '1'
+    }
+  });
 });
 
 // Chats Endpoints
@@ -1718,4 +1728,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (process.env.VERCEL !== '1') {
+  startServer();
+}
+
+export default app;

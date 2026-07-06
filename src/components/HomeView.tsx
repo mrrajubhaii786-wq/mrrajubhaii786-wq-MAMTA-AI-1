@@ -204,6 +204,29 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
     } catch (err: any) {
       console.error('Error sending chat:', err);
       // Insert custom local error if network fails
+      const errorMessage = err.message || 'Unknown network error occurred';
+      const errorChatMsg: ChatMessage = {
+        id: 'err-' + Date.now(),
+        sessionId,
+        role: 'model',
+        content: `⚠️ **Mamta AI Connection Error**
+
+Mujhe response generate karne me issue aa raha hai.
+
+**Sambhavit Kaaran (Possible Reasons):**
+1. Agar aap isko **Vercel** par chala rahe hain, to kya aapne Vercel Project settings me **\`GEMINI_API_KEY\`** aur relevant **Firebase Credentials** configure kiye hain?
+2. AI Studio me credentials automatic handle hote hain, par Vercel par aapko ye manual set karne padte hain.
+
+**Technical Error Message:**
+\`\`\`text
+${errorMessage}
+\`\`\`
+
+*Kripya apne Vercel Settings -> Environment Variables me \`GEMINI_API_KEY\` aur dusre \`FIREBASE_*\` variables check karein.*`,
+        timestamp: new Date().toISOString(),
+        pageSource: 'home'
+      };
+      setMessages(prev => [...prev, errorChatMsg]);
     } finally {
       setIsThinking(false);
     }

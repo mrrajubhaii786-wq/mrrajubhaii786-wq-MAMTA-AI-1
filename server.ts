@@ -776,52 +776,194 @@ app.get('/api/chats', async (req, res) => {
   }
 });
 
-// Intent Detection Layer (Phase 1)
-function detectIntent(input: string): 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge' {
-  const text = input.toLowerCase().trim();
+// MAMTA AI V7.4 — BRAIN SYSTEM MASTER PLAN
+class MamtaBrain {
+  private memory: any[] = [];
 
-  if (text.startsWith("/build") || text.includes("code") || text.includes("build app") || text.startsWith("/run")) {
-    return "developer";
-  }
-  if (text.includes("fix") || text.includes("error") || text.includes("debug") || text.includes("issue")) {
-    return "debug";
-  }
-  if (text.startsWith("/plan") || text.includes("plan") || text.includes("architecture") || text.includes("blueprint") || text.includes("roadmap")) {
-    return "planning";
-  }
-  if (text.startsWith("/wiki")) {
-    return "knowledge";
+  constructor() {
+    this.memory = [];
   }
 
-  return "chat";
-}
-
-// Local Response Engine (Phase 5 & Phase 9)
-function getLocalResponse(input: string, intent: 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge'): string | null {
-  const text = input.trim().toLowerCase();
-
-  // Task 5.1: Prevent execution in Home (Strict Execution Block)
-  if (text.startsWith("/build") || text.startsWith("/run") || text === "build app" || text === "run app") {
-    return "⚠️ Execution is only available in Workspace.\nClick 'Open Workspace' to continue.";
+  // Phase 7: Memory System
+  saveMemory(msg: any) {
+    this.memory.push(msg);
+    if (this.memory.length > 20) {
+      this.memory.shift();
+    }
   }
 
-  // Phase 9: Only call AI when needed (Short responses under 20 chars)
-  if (intent === 'chat' && text.length < 20) {
-    if (text === 'hi' || text === 'hello' || text === 'hey' || text === 'namaste') {
+  // Phase 2: Intent Detection
+  detectIntent(input: string): 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge' {
+    const text = input.toLowerCase().trim();
+
+    if (text.startsWith("/build") || text.includes("code") || text.includes("build app") || text.startsWith("/run")) {
+      return "developer";
+    }
+    if (text.includes("fix") || text.includes("error") || text.includes("debug") || text.includes("issue")) {
+      return "debug";
+    }
+    if (text.startsWith("/plan") || text.includes("plan") || text.includes("architecture") || text.includes("blueprint") || text.includes("roadmap")) {
+      return "planning";
+    }
+    if (text.startsWith("/wiki")) {
+      return "knowledge";
+    }
+
+    return "chat";
+  }
+
+  // Phase 6: Smart Decision Engine
+  isLocal(intent: string, input: string): boolean {
+    const text = input.toLowerCase().trim();
+    if (intent === "chat" && input.length < 20) return true;
+    if (text.startsWith("/help")) return true;
+    if (text.startsWith("/build") || text.startsWith("/run") || text === "build app" || text === "run app") return true;
+    return false;
+  }
+
+  // Phase 3: Local Brain
+  localResponse(input: string, intent: string): string {
+    const text = input.toLowerCase().trim();
+
+    // Prevent execution in Home (Strict Execution Block)
+    if (text.startsWith("/build") || text.startsWith("/run") || text === "build app" || text === "run app") {
+      return "⚠️ Execution is only available in Workspace.\nClick 'Open Workspace' to continue.";
+    }
+
+    if (text.startsWith("/help")) {
+      return "💡 **MAMTA AI Help Guide**:\n- Use `/plan [idea]` to generate a master design plan.\n- Use `/wiki [query]` to search our system documentation.\n- Ask simple questions for conversational chat!\n- Commands `/build` and `/run` are restricted to the Workspace tab.";
+    }
+
+    if (intent === "chat") {
+      return this.chatMode(input);
+    }
+
+    return "Got it 👍 Tell me more.";
+  }
+
+  // Phase 3: 🔥 Chat Mode (Most Important)
+  chatMode(input: string): string {
+    const text = input.toLowerCase().trim();
+
+    if (text.includes("hi") || text === "hello" || text === "hey" || text === "namaste") {
       return "Hi 👋 How can I help you today?";
     }
-    if (text === 'how are you' || text === 'how are you?' || text === 'how r u' || text === 'how are u') {
-      return "I'm doing great 😊 What can I help you with?";
+
+    if (text.includes("how are you")) {
+      return "I'm doing great 😊 What about you?";
     }
+
     if (text === 'thanks' || text === 'thank you') {
       return "You're very welcome! Let me know if you need anything else. 😊";
     }
+
     if (text === 'bye' || text === 'goodbye') {
       return "Goodbye! Have an amazing day ahead! 😊";
     }
+
+    return "Got it 👍 Tell me more.";
   }
 
-  return null;
+  // Phase 5: Fallback System
+  fallbackResponse(input: string): string {
+    return "⚠️ AI service is busy right now.\nBut I'm still here to help 👍";
+  }
+
+  // Phase 4: AI Engine (Smart Call)
+  async aiResponse(input: string, intent: string, sessionId: string, pageSource?: string): Promise<string> {
+    try {
+      // Check for explicit wiki command /wiki
+      if (input.startsWith('/wiki ')) {
+        const query = input.substring(6).trim().toLowerCase();
+        const wikiEntries = await firestoreWiki.getEntries();
+        const match = wikiEntries.find(
+          e => e.title.toLowerCase().includes(query) || e.content.toLowerCase().includes(query)
+        );
+
+        if (match) {
+          return `🔍 **OpenWiki Match Found**: **${match.title}**\n\n${match.content}\n\n*Tags: ${match.tags.join(', ')}*`;
+        } else {
+          return `❌ No OpenWiki entries found matching "${query}". You can add or search entries in the **Admin Dashboard > OpenWiki** panel.`;
+        }
+      }
+
+      const client = getGeminiClient();
+      firestoreLogs.incrementAiCalls();
+
+      // Phase 8: Response Style Control
+      let systemPrompt = '';
+      if (intent === 'chat') {
+        systemPrompt = `You are a friendly, human-like bilingually trained assistant.
+GLOBAL RULES (Phase 10):
+1. Keep your response extremely short, concise, and natural (strictly under 2-3 lines).
+2. NEVER over-explain, NEVER list features, and NEVER describe your system architecture or available modes.
+3. Keep the tone natural, warm, and conversational (English/Hindi blended naturally, e.g., "zaroor", "namaste", "bilkul").
+4. ALWAYS end with a friendly, conversational follow-up question to keep the dialogue going.
+5. Avoid low-quality AI-slop or infrastructure telemetry noise.`;
+      } else if (intent === 'planning') {
+        systemPrompt = `You are a senior system architect.
+Formulate a beautifully structured, medium-length Master Plan in clean markdown for the requested project/app.
+Include a high-level overview, key technical modules, and file structures.
+Be concise, clear, and structured. Conclude with a friendly invitation to click the "Send to Workspace" button to transfer this plan to the Workspace core.`;
+      } else if (intent === 'developer') {
+        systemPrompt = `You are an expert full-stack developer.
+Provide a highly detailed response outlining exact code files, libraries, and instructions for building the requested application.`;
+      } else if (intent === 'debug') {
+        systemPrompt = `You are a senior debugging engineer.
+Provide a step-by-step diagnostic and fixing response to resolve the reported error or issue. List exact steps clearly.`;
+      } else if (intent === 'knowledge') {
+        systemPrompt = `You are a knowledgeable system assistant.
+Provide a clean, structured informational overview or query match from the system architecture or wiki.`;
+      } else {
+        systemPrompt = `You are MAMTA AI, an autonomous full-stack AI development assistant. Speak naturally in bilingual English/Hindi.`;
+      }
+
+      // Retrieve conversation history (Phase 8: Store last 10 messages in memory context)
+      const history = (await firestoreChats.getChats(sessionId)).slice(-10);
+      const contents = history.map(msg => ({
+        role: msg.role === 'model' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+      }));
+
+      if (contents.length === 0) {
+        contents.push({ role: 'user', parts: [{ text: input }] });
+      }
+
+      const response = await generateContentWithRetry(client, {
+        model: currentModelSelection,
+        contents,
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.7,
+        }
+      });
+
+      return response.text || 'I am sorry, I could not generate a response at this time.';
+    } catch (e) {
+      return this.fallbackResponse(input);
+    }
+  }
+
+  // Phase 1: Core Brain Controller & Phase 9: Fail Safe System
+  async process(input: string, sessionId: string, pageSource?: string): Promise<{ content: string, intent: 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge', isLocal: boolean }> {
+    try {
+      const intent = this.detectIntent(input);
+
+      if (this.isLocal(intent, input)) {
+        const response = this.localResponse(input, intent);
+        return { content: response, intent, isLocal: true };
+      }
+
+      const response = await this.aiResponse(input, intent, sessionId, pageSource);
+      return { content: response, intent, isLocal: false };
+    } catch (e) {
+      return { 
+        content: "⚠️ Something went wrong, try again.", 
+        intent: "chat", 
+        isLocal: true 
+      };
+    }
+  }
 }
 
 app.post('/api/chats', async (req, res) => {
@@ -846,123 +988,30 @@ app.post('/api/chats', async (req, res) => {
       details: content.substring(0, 100)
     });
 
-    // Detect Intent
-    const intent = detectIntent(content);
+    // Process through MamtaBrain
+    const brain = new MamtaBrain();
+    const result = await brain.process(content, sessionId, pageSource);
 
-    // Check for local response (Phase 5 Execution block and Phase 9 AI Call Control)
-    const localResp = getLocalResponse(content, intent);
-    if (localResp) {
-      const modelMsg = await firestoreChats.addChat({
-        sessionId,
-        role: 'model',
-        content: localResp,
-        pageSource: 'home'
-      });
+    // Save to brain memory
+    brain.saveMemory({ role: 'user', content });
+    brain.saveMemory({ role: 'model', content: result.content });
 
-      return res.json({ 
-        userMessage: userMsg, 
-        modelMessage: modelMsg,
-        suggestWorkspaceRedirect: intent === 'developer',
-        suggestedAction: intent === 'developer' ? 'redirect_workspace' : 'none'
-      });
-    }
-
-    // Check for explicit wiki command /wiki
-    if (content.startsWith('/wiki ')) {
-      const query = content.substring(6).trim().toLowerCase();
-      const wikiEntries = await firestoreWiki.getEntries();
-      const match = wikiEntries.find(
-        e => e.title.toLowerCase().includes(query) || e.content.toLowerCase().includes(query)
-      );
-
-      let modelReply = '';
-      if (match) {
-        modelReply = `🔍 **OpenWiki Match Found**: **${match.title}**\n\n${match.content}\n\n*Tags: ${match.tags.join(', ')}*`;
-      } else {
-        modelReply = `❌ No OpenWiki entries found matching "${query}". You can add or search entries in the **Admin Dashboard > OpenWiki** panel.`;
-      }
-
-      const modelMsg = await firestoreChats.addChat({
-        sessionId,
-        role: 'model',
-        content: modelReply,
-        pageSource: 'home'
-      });
-
-      return res.json({ userMessage: userMsg, modelMessage: modelMsg });
-    }
-
-    // Call Gemini for general chat
-    const client = getGeminiClient();
-    firestoreLogs.incrementAiCalls();
-
-    // Select dynamic system prompt according to intent (Phase 2 & 3 & 10)
-    let systemPrompt = '';
-    
-    if (intent === 'chat') {
-      systemPrompt = `You are a friendly, human-like bilingually trained assistant.
-GLOBAL RULES (Phase 10):
-1. Keep your response extremely short, concise, and natural (strictly under 2-3 lines).
-2. NEVER over-explain, NEVER list features, and NEVER describe your system architecture or available modes.
-3. Keep the tone natural, warm, and conversational (English/Hindi blended naturally, e.g., "zaroor", "namaste", "bilkul").
-4. ALWAYS end with a friendly, conversational follow-up question to keep the dialogue going.
-5. Avoid low-quality AI-slop or infrastructure telemetry noise.`;
-    } else if (intent === 'planning') {
-      systemPrompt = `You are a senior system architect.
-Formulate a beautifully structured, medium-length Master Plan in clean markdown for the requested project/app.
-Include a high-level overview, key technical modules, and file structures.
-Be concise, clear, and structured. Conclude with a friendly invitation to click the "Send to Workspace" button to transfer this plan to the Workspace core.`;
-    } else if (intent === 'developer') {
-      systemPrompt = `You are an expert full-stack developer.
-Provide a highly detailed response outlining exact code files, libraries, and instructions for building the requested application.`;
-    } else if (intent === 'debug') {
-      systemPrompt = `You are a senior debugging engineer.
-Provide a step-by-step diagnostic and fixing response to resolve the reported error or issue. List exact steps clearly.`;
-    } else if (intent === 'knowledge') {
-      systemPrompt = `You are a knowledgeable system assistant.
-Provide a clean, structured informational overview or query match from the system architecture or wiki.`;
-    } else {
-      systemPrompt = `You are MAMTA AI, an autonomous full-stack AI development assistant. Speak naturally in bilingual English/Hindi.`;
-    }
-
-    // Retrieve conversation history (Phase 8: Store last 10 messages in memory context)
-    const history = (await firestoreChats.getChats(sessionId)).slice(-10);
-    const contents = history.map(msg => ({
-      role: msg.role === 'model' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
-
-    // If history is empty, populate contents
-    if (contents.length === 0) {
-      contents.push({ role: 'user', parts: [{ text: content }] });
-    }
-
-    const response = await generateContentWithRetry(client, {
-      model: currentModelSelection,
-      contents,
-      config: {
-        systemInstruction: systemPrompt,
-        temperature: 0.7,
-      }
-    });
-
-    const aiText = response.text || 'I am sorry, I could not generate a response at this time.';
-    
-    const isPlanningIntent = intent === 'planning';
-
-    // Add Model Response
+    // Add Model Response to Database
     const modelMsg = await firestoreChats.addChat({
       sessionId,
       role: 'model',
-      content: aiText,
+      content: result.content,
       pageSource: pageSource || 'home'
     });
+
+    const isPlanningIntent = result.intent === 'planning';
+    const isDeveloperIntent = result.intent === 'developer';
 
     res.json({
       userMessage: userMsg,
       modelMessage: modelMsg,
-      suggestWorkspaceRedirect: isPlanningIntent,
-      suggestedAction: isPlanningIntent ? 'generate_plan' : 'none'
+      suggestWorkspaceRedirect: isPlanningIntent || (isDeveloperIntent && result.isLocal),
+      suggestedAction: isPlanningIntent ? 'generate_plan' : (isDeveloperIntent && result.isLocal ? 'redirect_workspace' : 'none')
     });
 
   } catch (err: any) {

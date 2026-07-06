@@ -101,10 +101,8 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
   
   // Suggested templates (Phase 1)
   const SUGGESTED_PROMPTS = [
-    { label: '/plan Ek modern resume website', sub: 'Generates real-time development blueprint' },
-    { label: '/wiki MAMTA AI System Architecture', sub: 'Instant offline knowledge base query' },
-    { label: 'Ek secure contact form banana hai', sub: 'Formulate an elegant bilingually structured web app' },
-    { label: '/wiki SafeDrop Encrypted Vault Details', sub: 'Learn about AES cryptographic keys' }
+    { label: '/plan Ek modern resume website', sub: 'Generate master plan' },
+    { label: '/wiki MAMTA AI System Architecture', sub: 'Query system architecture' }
   ];
 
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -278,34 +276,34 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
       <div className="flex-1 w-full overflow-y-auto py-6 space-y-6 custom-scrollbar scroll-smooth pr-1">
         
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center text-center py-20 space-y-8 select-none">
+          <div className="flex flex-col items-center justify-center text-center py-20 space-y-6 select-none">
             <div className="relative">
-              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/5">
-                <Bot className="w-8 h-8 animate-pulse" />
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/5">
+                <Bot className="w-6 h-6 animate-pulse" />
               </div>
               <div className="absolute inset-0 bg-emerald-500/10 blur-xl rounded-full -z-10" />
             </div>
 
-            <div className="max-w-md space-y-2">
-              <h2 className="text-xl font-bold text-slate-100 tracking-tight font-display">MAMTA AI — Deep Brain</h2>
-              <p className="text-xs text-slate-400 leading-normal">
-                Namaste! Swagat hai! I am your bilingually trained autonomous developer assistant. Ask me questions, search OpenWiki, or let me formulate professional Master Plans.
+            <div className="max-w-md space-y-1">
+              <h2 className="text-lg font-bold text-slate-100 tracking-tight font-display">How can I help you today?</h2>
+              <p className="text-xs text-slate-500">
+                Ask a quick question, search OpenWiki, or generate a development plan.
               </p>
             </div>
 
             {/* suggested templates */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl text-left pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl text-left pt-2">
               {SUGGESTED_PROMPTS.map((prompt, idx) => (
                 <button
                   key={idx}
                   onClick={() => handleSendMessage(prompt.label)}
-                  className="p-3 rounded-xl bg-slate-900/40 border border-slate-900 hover:border-emerald-500/30 hover:bg-slate-900/80 text-left transition-all duration-300 group cursor-pointer"
+                  className="p-3 rounded-xl bg-slate-900/40 border border-slate-900 hover:border-emerald-500/30 hover:bg-slate-900/80 text-left transition-all duration-300 group cursor-pointer animate-[fadeIn_0.3s_ease]"
                 >
                   <p className="text-xs font-semibold text-emerald-400 group-hover:text-emerald-300 flex items-center justify-between">
                     {prompt.label}
                     <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
                   </p>
-                  <p className="text-[10px] text-slate-500 mt-1">{prompt.sub}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{prompt.sub}</p>
                 </button>
               ))}
             </div>
@@ -319,9 +317,10 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
           const isStreamCompleted = completedStreams[msg.id];
           const shouldStream = isLatestAI && !isStreamCompleted;
 
-          // Check if message content indicates planning
+          // Check if message content indicates planning or workspace redirects
           const contentLower = msg.content.toLowerCase();
           const hasPlanKeyword = contentLower.includes('plan') || contentLower.includes('blueprint') || contentLower.includes('roadmap') || contentLower.includes('task');
+          const isExecutionBlockMsg = msg.content.includes('Execution is only available in Workspace');
 
           return (
             <div 
@@ -352,24 +351,46 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
                   )}
                 </div>
 
-                {/* Inline Action Card if a Master Plan is referenced (Phase 1 Special Logic) */}
-                {isAI && hasPlanKeyword && (
+                {/* Inline Action Card if a Master Plan is referenced (Phase 6 Plan Transfer System) */}
+                {isAI && hasPlanKeyword && !isExecutionBlockMsg && (
                   <div className="border border-emerald-500/20 bg-emerald-500/5 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-[fadeIn_0.3s_ease]">
                     <div className="flex items-start gap-2.5">
                       <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
                         <BookOpen className="w-4 h-4" />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-slate-200">Formulate Actionable Master Plan</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Let Gemini decompose this request and build the file trees in the Workspace IDE.</p>
+                        <p className="text-xs font-semibold text-slate-200">Send to Workspace Core</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Decompose this plan into real checklists and start crafting interactive code files in the IDE.</p>
                       </div>
                     </div>
                     <button
                       onClick={() => handleTriggerPlanCreation(messages[idx - 1]?.content || msg.content)}
-                      className="shrink-0 w-full sm:w-auto px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/15 transition-all duration-200 hover:scale-[1.02]"
+                      className="shrink-0 w-full sm:w-auto px-4 py-2.5 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/15 transition-all duration-200 hover:scale-[1.02]"
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Create Plan & Open</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                      <span>Send to Workspace</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Inline Action Card if Execution Block is triggered (Phase 5) */}
+                {isAI && isExecutionBlockMsg && (
+                  <div className="border border-teal-500/20 bg-teal-500/5 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-[fadeIn_0.3s_ease]">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 shrink-0 mt-0.5">
+                        <Plus className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-200">Access Workspace IDE</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Open the build core where you can run/build files, edit scripts, and view compiled web previews.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('workspace')}
+                      className="shrink-0 w-full sm:w-auto px-4 py-2.5 text-xs font-semibold rounded-lg bg-teal-500 hover:bg-teal-600 text-slate-950 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-teal-500/15 transition-all duration-200 hover:scale-[1.02]"
+                    >
+                      <ArrowRight className="w-3.5 h-3.5" />
+                      <span>Open Workspace</span>
                     </button>
                   </div>
                 )}

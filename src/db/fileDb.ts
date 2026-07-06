@@ -111,42 +111,71 @@ export function writeDb(db: DbSchema) {
 }
 
 // Cryptography Helpers
-const ALGORITHM = 'aes-256-cbc';
-const SALT = 'mamta_ai_encryption_salt_2026';
-
-function deriveKeyAndIv(masterPassword: string): { key: Buffer; iv: Buffer } {
-  // Use PBKDF2 to derive a stable 256-bit key and 128-bit IV from the master password
-  const key = crypto.pbkdf2Sync(masterPassword, SALT, 10000, 32, 'sha256');
-  // Use a derived stable IV or create one based on password. For AES-CBC we can derive it deterministically or store it.
-  // To make it securely reversible but fully self-contained without storing separate IVs in a complex way,
-  // we will derive a stable 16-byte IV from PBKDF2 with a different iteration/salt.
-  const iv = crypto.pbkdf2Sync(masterPassword, SALT + '_iv', 5000, 16, 'sha256');
-  return { key, iv };
-}
+const ALGORITHM = 'aes-256-gcm';
+const PBKDF2_ITERATIONS = 600000;
+const KEY_LENGTH = 32;
+const IV_LENGTH = 16;
+const SALT_LENGTH = 32;
 
 export function encryptValue(plainText: string, masterPassword: string): string {
   try {
-    const { key, iv } = deriveKeyAndIv(masterPassword);
+    const salt = crypto.randomBytes(SALT_LENGTH);
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const key = crypto.pbkdf2Sync(
+      masterPassword, salt, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha512'
+    );
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
     let encrypted = cipher.update(plainText, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    return encrypted;
+    const authTag = cipher.getAuthTag();
+    return `v2:${salt.toString('hex')}:${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
   } catch (err) {
     console.error('Encryption failed:', err);
-    throw new Error('Encryption failed. Verify master password parameters.');
+    throw new Error('Encryption failed. Verify master password strength.');
   }
 }
 
-export function decryptValue(encryptedHex: string, masterPassword: string): string {
+export function decryptValue(encryptedPayload: string, masterPassword: string): string {
   try {
-    const { key, iv } = deriveKeyAndIv(masterPassword);
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-    let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
+    if (encryptedPayload.startsWith('v2:')) {
+      const parts = encryptedPayload.split(':');
+      const [, saltHex, ivHex, authTagHex, encrypted] = parts;
+      const salt = Buffer.from(saltHex, 'hex');
+      const iv = Buffer.from(ivHex, 'hex');
+      const authTag = Buffer.from(authTagHex, 'hex');
+      const key = crypto.pbkdf2Sync(
+        masterPassword, salt, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha512'
+      );
+      const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+      decipher.setAuthTag(authTag);
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      return decrypted;
+    }
+    // Legacy fallback
+    return decryptLegacy(encryptedPayload, masterPassword);
   } catch (err) {
-    console.error('Decryption failed (likely invalid password):', err);
-    throw new Error('Decryption failed. Please verify that your Master Password is correct.');
+    console.error('Decryption failed:', err);
+    throw new Error('Decryption failed. Invalid master password.');
+  }
+}
+
+function decryptLegacy(encryptedHex: string, masterPassword: string): string {
+  const LEGACY_SALT = 'mamta_ai_encryption_salt_2026';
+  const key = crypto.pbkdf2Sync(masterPassword, LEGACY_SALT, 10000, 32, 'sha256');
+  const iv = crypto.pbkdf2Sync(masterPassword, LEGACY_SALT + '_iv', 5000, 16, 'sha256');
+  const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+  let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+}
+
+export function verifyMasterPassword(encryptedPayload: string, masterPassword: string): boolean {
+  try {
+    decryptValue(encryptedPayload, masterPassword);
+    return true;
+  } catch {
+    return false;
   }
 }
 

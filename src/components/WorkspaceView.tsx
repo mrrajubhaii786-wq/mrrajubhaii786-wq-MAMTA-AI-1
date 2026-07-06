@@ -387,8 +387,7 @@ User Query: "${userText}"`;
               </div>
               <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                 <div 
-                  className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full transition-all duration-500" 
-                  style={{ width: `${completionPct}%` }}
+                  className={`bg-gradient-to-r from-emerald-500 to-teal-500 h-full transition-all duration-500 progress-${Math.round(completionPct / 5) * 5}`} 
                 />
               </div>
               <p className="text-[9px] text-slate-500 mt-1">

@@ -19,6 +19,7 @@ import HomeView from './components/HomeView';
 import WorkspaceView from './components/WorkspaceView';
 import AdminView from './components/AdminView';
 import SafeDropView from './components/SafeDropView';
+import ErrorBoundary from './components/ErrorBoundary';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'workspace' | 'admin' | 'safedrop'>('home');
@@ -225,37 +226,39 @@ export default function App() {
       {/* 2. CORE VIEW CONTENT WRAPPER */}
       <main className="flex-1 flex flex-col p-2.5 lg:p-3.5 mt-14 lg:mt-0 overflow-hidden relative z-10">
         
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="flex-1 overflow-hidden"
-          >
-            {activeTab === 'home' && (
-              <HomeView 
-                sessionId={sessionId} 
-                onSelectPlan={handleSelectPlan}
-                setActiveTab={setActiveTab}
-              />
-            )}
-            {activeTab === 'workspace' && (
-              <WorkspaceView 
-                sessionId={sessionId} 
-                selectedPlanId={selectedPlanId}
-                onSelectPlan={handleSelectPlan}
-              />
-            )}
-            {activeTab === 'admin' && (
-              <AdminView sessionId={sessionId} />
-            )}
-            {activeTab === 'safedrop' && (
-              <SafeDropView sessionId={sessionId} />
-            )}
-          </motion.div>
-        </AnimatePresence>
+        <ErrorBoundary>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="flex-1 overflow-hidden"
+            >
+              {activeTab === 'home' && (
+                <HomeView 
+                  sessionId={sessionId} 
+                  onSelectPlan={handleSelectPlan}
+                  setActiveTab={setActiveTab}
+                />
+              )}
+              {activeTab === 'workspace' && (
+                <WorkspaceView 
+                  sessionId={sessionId} 
+                  selectedPlanId={selectedPlanId}
+                  onSelectPlan={handleSelectPlan}
+                />
+              )}
+              {activeTab === 'admin' && (
+                <AdminView sessionId={sessionId} />
+              )}
+              {activeTab === 'safedrop' && (
+                <SafeDropView sessionId={sessionId} />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </ErrorBoundary>
 
       </main>
 

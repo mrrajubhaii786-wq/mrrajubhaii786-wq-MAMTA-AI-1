@@ -4,6 +4,7 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
+import { randomUUID } from 'crypto';
 
 // Load environment variables
 dotenv.config();
@@ -35,13 +36,21 @@ import {
   limit, 
   writeBatch 
 } from 'firebase/firestore';
-import firebaseConfig from './firebase-applet-config.json' with { type: 'json' };
+import firebaseConfig from './src/lib/firebase-config';
 import { db as pgDb } from './src/db/index';
 import { users as pgUsers, plans as pgPlans, tasks as pgTasks, builds as pgBuilds } from './src/db/schema';
 import { eq } from 'drizzle-orm';
 import { ChatMessage, MasterPlan, ProjectTask, VaultItem, WikiEntry, ActivityLog } from './src/types';
 
+// Security Middlewares and Utilities
+import { verifyAuth, verifyAdmin, optionalAuth } from './src/middleware/auth';
+import { validate, chatValidation, planValidation, vaultValidation, wikiValidation, githubPushValidation } from './src/middleware/validation';
+import { apiLimiter, chatLimiter, planLimiter, adminLimiter } from './src/middleware/rateLimit';
+import helmet from 'helmet';
+import { getRealSystemMetrics } from './src/services/systemMetrics';
+
 const app = express();
+app.set('trust proxy', 1);
 const PORT = 3000;
 
 enum OperationType {
@@ -242,7 +251,7 @@ const firestoreChats = {
     }
   },
   async addChat(chat: { sessionId: string; role: 'user' | 'model'; content: string; pageSource: string }): Promise<ChatMessage> {
-    const id = 'chat_' + Math.random().toString(36).substring(2, 11);
+    const id = 'chat_' + randomUUID();
     const newChat: ChatMessage = {
       id,
       ...chat,
@@ -308,7 +317,7 @@ const firestoreLogs = {
     }
   },
   async addActivityLog(log: Omit<ActivityLog, 'id' | 'timestamp'>): Promise<ActivityLog> {
-    const id = 'log_' + Math.random().toString(36).substring(2, 11);
+    const id = 'log_' + randomUUID();
     const newLog: ActivityLog = {
       id,
       ...log,
@@ -361,7 +370,7 @@ const firestoreWiki = {
     }
   },
   async addEntry(title: string, content: string, tags: string[]): Promise<WikiEntry> {
-    const id = 'wiki_' + Math.random().toString(36).substring(2, 11);
+    const id = 'wiki_' + randomUUID();
     const newEntry: WikiEntry = {
       id,
       title,
@@ -434,7 +443,7 @@ const firestoreVault = {
     }
   },
   async addVaultItem(keyName: string, value: string, itemType: VaultItem['itemType'], masterPassword: string): Promise<VaultItem> {
-    const id = 'vault_' + Math.random().toString(36).substring(2, 11);
+    const id = 'vault_' + randomUUID();
     const encrypted = encryptValue(value, masterPassword);
     const newItem: VaultItem = {
       id,
@@ -654,6 +663,24 @@ const sqlTasks = {
 
 app.use(express.json());
 
+// Apply Helmet Security Headers - Disable strict CSP in development to let Vite load modules
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://generativelanguage.googleapis.com", "https://firestore.googleapis.com"],
+    },
+  } : false,
+  hsts: process.env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
+}));
+
+// Apply Global Rate Limiting to APIs
+app.use('/api/', apiLimiter);
+
 // Initialize AI Client Lazily to prevent crash on startup if key is missing
 let aiClient: GoogleGenAI | null = null;
 let currentModelSelection = 'gemini-3.5-flash';
@@ -681,6 +708,54 @@ function trackAiCall() {
   dbLogs.incrementAiCalls();
 }
 
+// Resilient wrapper with exponential backoff and dynamic model fallback for high demand/rate limits
+async function generateContentWithRetry(
+  client: GoogleGenAI,
+  params: Parameters<typeof client.models.generateContent>[0],
+  maxRetries = 3,
+  initialDelayMs = 1500
+): ReturnType<typeof client.models.generateContent> {
+  let attempt = 0;
+  
+  while (true) {
+    try {
+      return await client.models.generateContent(params);
+    } catch (err: any) {
+      attempt++;
+      console.error(`Gemini API call failed (attempt ${attempt}/${maxRetries}):`, err);
+      
+      const isRetryable = 
+        err?.status === 'UNAVAILABLE' || 
+        err?.code === 503 || 
+        err?.status === 'RESOURCE_EXHAUSTED' || 
+        err?.code === 429 ||
+        String(err?.message || '').includes('503') ||
+        String(err?.message || '').includes('UNAVAILABLE') ||
+        String(err?.message || '').includes('high demand') ||
+        attempt < maxRetries;
+        
+      if (attempt >= maxRetries || !isRetryable) {
+        throw err;
+      }
+      
+      // On the final retry, fallback to a more available model if the current one is experiencing high demand
+      if (attempt === maxRetries - 1) {
+        if (params.model === 'gemini-3.5-flash') {
+          console.log(`Switching model from gemini-3.5-flash to gemini-flash-latest fallback for final retry`);
+          params.model = 'gemini-flash-latest';
+        } else if (params.model === 'gemini-3.1-pro-preview') {
+          console.log(`Switching model from gemini-3.1-pro-preview to gemini-3.5-flash fallback for final retry`);
+          params.model = 'gemini-3.5-flash';
+        }
+      }
+      
+      const delay = initialDelayMs * Math.pow(2.2, attempt - 1) * (0.8 + Math.random() * 0.4);
+      console.log(`Retrying Gemini API call in ${Math.round(delay)}ms due to status/error...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
 // ----------------------------------------------------
 // API ROUTES
 // ----------------------------------------------------
@@ -700,6 +775,54 @@ app.get('/api/chats', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Intent Detection Layer (Phase 1)
+function detectIntent(input: string): 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge' {
+  const text = input.toLowerCase().trim();
+
+  if (text.startsWith("/build") || text.includes("code") || text.includes("build app") || text.startsWith("/run")) {
+    return "developer";
+  }
+  if (text.includes("fix") || text.includes("error") || text.includes("debug") || text.includes("issue")) {
+    return "debug";
+  }
+  if (text.startsWith("/plan") || text.includes("plan") || text.includes("architecture") || text.includes("blueprint") || text.includes("roadmap")) {
+    return "planning";
+  }
+  if (text.startsWith("/wiki")) {
+    return "knowledge";
+  }
+
+  return "chat";
+}
+
+// Local Response Engine (Phase 5 & Phase 9)
+function getLocalResponse(input: string, intent: 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge'): string | null {
+  const text = input.trim().toLowerCase();
+
+  // Task 5.1: Prevent execution in Home (Strict Execution Block)
+  if (text.startsWith("/build") || text.startsWith("/run") || text === "build app" || text === "run app") {
+    return "⚠️ Execution is only available in Workspace.\nClick 'Open Workspace' to continue.";
+  }
+
+  // Phase 9: Only call AI when needed (Short responses under 20 chars)
+  if (intent === 'chat' && text.length < 20) {
+    if (text === 'hi' || text === 'hello' || text === 'hey' || text === 'namaste') {
+      return "Hi 👋 How can I help you today?";
+    }
+    if (text === 'how are you' || text === 'how are you?' || text === 'how r u' || text === 'how are u') {
+      return "I'm doing great 😊 What can I help you with?";
+    }
+    if (text === 'thanks' || text === 'thank you') {
+      return "You're very welcome! Let me know if you need anything else. 😊";
+    }
+    if (text === 'bye' || text === 'goodbye') {
+      return "Goodbye! Have an amazing day ahead! 😊";
+    }
+  }
+
+  return null;
+}
 
 app.post('/api/chats', async (req, res) => {
   const { sessionId, content, pageSource } = req.body;
@@ -722,6 +845,27 @@ app.post('/api/chats', async (req, res) => {
       userSession: sessionId,
       details: content.substring(0, 100)
     });
+
+    // Detect Intent
+    const intent = detectIntent(content);
+
+    // Check for local response (Phase 5 Execution block and Phase 9 AI Call Control)
+    const localResp = getLocalResponse(content, intent);
+    if (localResp) {
+      const modelMsg = await firestoreChats.addChat({
+        sessionId,
+        role: 'model',
+        content: localResp,
+        pageSource: 'home'
+      });
+
+      return res.json({ 
+        userMessage: userMsg, 
+        modelMessage: modelMsg,
+        suggestWorkspaceRedirect: intent === 'developer',
+        suggestedAction: intent === 'developer' ? 'redirect_workspace' : 'none'
+      });
+    }
 
     // Check for explicit wiki command /wiki
     if (content.startsWith('/wiki ')) {
@@ -752,23 +896,37 @@ app.post('/api/chats', async (req, res) => {
     const client = getGeminiClient();
     firestoreLogs.incrementAiCalls();
 
-    const systemPrompt = `You are MAMTA AI (v7.2), an autonomous full-stack AI development assistant.
-You respond in a friendly, highly professional, objective, and bilingual manner, speaking both English and Hindi naturally depending on context (e.g. incorporating words like "Swagat hai", "bilkul", "Zaroor", "aapka plan").
-Keep your responses beautifully structured in clear markdown with clean headings, readable bullet points, and elegant typography.
+    // Select dynamic system prompt according to intent (Phase 2 & 3 & 10)
+    let systemPrompt = '';
+    
+    if (intent === 'chat') {
+      systemPrompt = `You are a friendly, human-like bilingually trained assistant.
+GLOBAL RULES (Phase 10):
+1. Keep your response extremely short, concise, and natural (strictly under 2-3 lines).
+2. NEVER over-explain, NEVER list features, and NEVER describe your system architecture or available modes.
+3. Keep the tone natural, warm, and conversational (English/Hindi blended naturally, e.g., "zaroor", "namaste", "bilkul").
+4. ALWAYS end with a friendly, conversational follow-up question to keep the dialogue going.
+5. Avoid low-quality AI-slop or infrastructure telemetry noise.`;
+    } else if (intent === 'planning') {
+      systemPrompt = `You are a senior system architect.
+Formulate a beautifully structured, medium-length Master Plan in clean markdown for the requested project/app.
+Include a high-level overview, key technical modules, and file structures.
+Be concise, clear, and structured. Conclude with a friendly invitation to click the "Send to Workspace" button to transfer this plan to the Workspace core.`;
+    } else if (intent === 'developer') {
+      systemPrompt = `You are an expert full-stack developer.
+Provide a highly detailed response outlining exact code files, libraries, and instructions for building the requested application.`;
+    } else if (intent === 'debug') {
+      systemPrompt = `You are a senior debugging engineer.
+Provide a step-by-step diagnostic and fixing response to resolve the reported error or issue. List exact steps clearly.`;
+    } else if (intent === 'knowledge') {
+      systemPrompt = `You are a knowledgeable system assistant.
+Provide a clean, structured informational overview or query match from the system architecture or wiki.`;
+    } else {
+      systemPrompt = `You are MAMTA AI, an autonomous full-stack AI development assistant. Speak naturally in bilingual English/Hindi.`;
+    }
 
-You are the brain of the MAMTA AI platform, which includes:
-- **Home Chat (this core)**: Conversational assistant, bilingual brainstorming, and the Planning Engine.
-- **Workspace IDE**: Dynamic developer suite which analyze plans, creates task checklists, writes functional code files, displays files, and pushes builds.
-- **Admin Dashboard**: System telemetry, system health graphs, logging timeline, and OpenWiki CRUD knowledge base.
-- **SafeDrop Vault**: Highly encrypted secrets locker (AES-256-CBC) with timed 10s reveal.
-
-**Special Directives**:
-- If the user asks you to create a project, website, app, or master plan, formulate a highly detailed structural plan and EXPLICITLY conclude with an invitation to transfer it to the Workspace core.
-- Your response must include a specific visual queue or markdown structure that lets the platform know you generated a plan, but do not write any system codes directly in response.
-- Use simple literal wording. Avoid low-quality AI-slop or infrastructure telemetry noise.`;
-
-    // Retrieve conversation history
-    const history = (await firestoreChats.getChats(sessionId)).slice(-8); // Get last 8 messages for context
+    // Retrieve conversation history (Phase 8: Store last 10 messages in memory context)
+    const history = (await firestoreChats.getChats(sessionId)).slice(-10);
     const contents = history.map(msg => ({
       role: msg.role === 'model' ? 'model' : 'user',
       parts: [{ text: msg.content }]
@@ -779,7 +937,7 @@ You are the brain of the MAMTA AI platform, which includes:
       contents.push({ role: 'user', parts: [{ text: content }] });
     }
 
-    const response = await client.models.generateContent({
+    const response = await generateContentWithRetry(client, {
       model: currentModelSelection,
       contents,
       config: {
@@ -790,16 +948,7 @@ You are the brain of the MAMTA AI platform, which includes:
 
     const aiText = response.text || 'I am sorry, I could not generate a response at this time.';
     
-    // Simple intent detection
-    const lowercasePrompt = content.toLowerCase();
-    const isPlanningIntent = 
-      lowercasePrompt.includes('plan') || 
-      lowercasePrompt.includes('website') || 
-      lowercasePrompt.includes('app') || 
-      lowercasePrompt.includes('project') || 
-      lowercasePrompt.includes('banao') || 
-      lowercasePrompt.includes('build') ||
-      lowercasePrompt.includes('code');
+    const isPlanningIntent = intent === 'planning';
 
     // Add Model Response
     const modelMsg = await firestoreChats.addChat({
@@ -880,7 +1029,7 @@ Format your response as markdown with these precise structural sections:
 
 Ensure the breakdown uses clear headings for tasks so that they can be easily parsed. Return only the beautiful Markdown plan.`;
 
-    const response = await client.models.generateContent({
+    const response = await generateContentWithRetry(client, {
       model: currentModelSelection,
       contents: prompt,
       config: {
@@ -959,7 +1108,7 @@ You MUST respond with a valid JSON array matching this exact schema:
 
 Do not return any markdown code block wraps (\`\`\`json) or other text surrounding the JSON array. Output raw JSON only.`;
 
-    const response = await client.models.generateContent({
+    const response = await generateContentWithRetry(client, {
       model: currentModelSelection,
       contents: prompt,
       config: {
@@ -1073,7 +1222,7 @@ Do not return any markdown wraps or wrapper text. Return only the raw JSON.`;
     // We use gemini-3.1-pro-preview for complex tasks like file generation if selected, otherwise fallback
     const modelToUse = currentModelSelection === 'gemini-3.1-pro-preview' ? 'gemini-3.1-pro-preview' : 'gemini-3.5-flash';
 
-    const response = await client.models.generateContent({
+    const response = await generateContentWithRetry(client, {
       model: modelToUse,
       contents: prompt,
       config: {

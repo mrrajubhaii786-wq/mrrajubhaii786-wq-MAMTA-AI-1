@@ -250,8 +250,7 @@ export default function AdminView({ sessionId }: AdminViewProps) {
                   </div>
                   <div className="w-full bg-slate-850 h-1.5 rounded-full overflow-hidden">
                     <div 
-                      className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full transition-all duration-300" 
-                      style={{ width: `${metrics?.cpuUsage || 15}%` }}
+                      className={`bg-gradient-to-r from-emerald-500 to-teal-500 h-full transition-all duration-300 progress-${Math.round((metrics?.cpuUsage || 15) / 5) * 5}`} 
                     />
                   </div>
                 </div>
@@ -264,8 +263,7 @@ export default function AdminView({ sessionId }: AdminViewProps) {
                   </div>
                   <div className="w-full bg-slate-850 h-1.5 rounded-full overflow-hidden">
                     <div 
-                      className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full transition-all duration-300" 
-                      style={{ width: `${metrics?.memoryUsage?.percentage ?? 12}%` }}
+                      className={`bg-gradient-to-r from-emerald-500 to-teal-500 h-full transition-all duration-300 progress-${Math.round((metrics?.memoryUsage?.percentage ?? 12) / 5) * 5}`} 
                     />
                   </div>
                 </div>
@@ -278,8 +276,7 @@ export default function AdminView({ sessionId }: AdminViewProps) {
                   </div>
                   <div className="w-full bg-slate-850 h-1.5 rounded-full overflow-hidden">
                     <div 
-                      className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full transition-all duration-300" 
-                      style={{ width: `${metrics?.diskUsage?.percentage ?? 34}%` }}
+                      className={`bg-gradient-to-r from-emerald-500 to-teal-500 h-full transition-all duration-300 progress-${Math.round((metrics?.diskUsage?.percentage ?? 34) / 5) * 5}`} 
                     />
                   </div>
                 </div>

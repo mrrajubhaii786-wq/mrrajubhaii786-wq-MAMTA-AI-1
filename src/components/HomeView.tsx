@@ -165,7 +165,18 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
           });
         });
         
-        setMessages(list);
+        setMessages(prev => {
+          // Merge lists: keep any temporary/optimistic messages (e.g. id starts with 'user-temp-', 'model-temp-', 'err-' or 'block-')
+          // that are NOT yet stored and fetched from the Firestore database
+          const tempMsgs = prev.filter(msg => 
+            (msg.id.toString().startsWith('user-temp-') || 
+             msg.id.toString().startsWith('model-temp-') || 
+             msg.id.toString().startsWith('err-') || 
+             msg.id.toString().startsWith('block-')) &&
+            !list.some(dMsg => dMsg.content === msg.content && dMsg.role === msg.role)
+          );
+          return [...list, ...tempMsgs];
+        });
 
         // Capture the last AI message ID to trigger typing simulation
         const lastMsg = list[list.length - 1];
@@ -202,7 +213,18 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
     try {
       const res = await fetch(`/api/chats?sessionId=${sessionId}`);
       const data = await res.json();
-      setMessages(data);
+      if (Array.isArray(data)) {
+        setMessages(prev => {
+          const tempMsgs = prev.filter(msg => 
+            (msg.id.toString().startsWith('user-temp-') || 
+             msg.id.toString().startsWith('model-temp-') || 
+             msg.id.toString().startsWith('err-') || 
+             msg.id.toString().startsWith('block-')) &&
+            !data.some(dMsg => dMsg.content === msg.content && dMsg.role === msg.role)
+          );
+          return [...data, ...tempMsgs];
+        });
+      }
     } catch (err) {
       console.error('REST chats failed:', err);
     }
@@ -248,6 +270,25 @@ Execution triggers and builds are only available in the Workspace tab. Please sw
     try {
       // Process through MamtaBrain on client side
       const response = await brain.process(trimmedInput, sessionId);
+
+      // Append model response to UI state instantly as an optimistic model message, 
+      // preventing any visual gaps or latency lag from the database call
+      if (response) {
+        const modelTempMsg: ChatMessage = {
+          id: 'model-temp-' + Date.now(),
+          sessionId,
+          role: 'model',
+          content: response,
+          timestamp: new Date().toISOString(),
+          pageSource: 'home'
+        };
+        setMessages(prev => {
+          if (prev.some(msg => msg.content === response && msg.role === 'model')) {
+            return prev;
+          }
+          return [...prev, modelTempMsg];
+        });
+      }
 
       // Always trigger REST fetch to guarantee perfect state synchronization
       // (crucial if Firestore subscription is blocked/errored/offline)

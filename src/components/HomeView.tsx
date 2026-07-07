@@ -231,6 +231,17 @@ Execution triggers and builds are only available in the Workspace tab. Please sw
       return;
     }
 
+    // Instantly append user's message for real-time visual responsiveness
+    const userTempMsg: ChatMessage = {
+      id: 'user-temp-' + Date.now(),
+      sessionId,
+      role: 'user',
+      content: trimmedInput,
+      timestamp: new Date().toISOString(),
+      pageSource: 'home'
+    };
+    setMessages(prev => [...prev, userTempMsg]);
+
     setInput('');
     setIsThinking(true);
 
@@ -238,10 +249,9 @@ Execution triggers and builds are only available in the Workspace tab. Please sw
       // Process through MamtaBrain on client side
       const response = await brain.process(trimmedInput, sessionId);
 
-      // REST fallback sync if snapshot fails (only if Firestore not active)
-      if (!db) {
-        fetchChatsREST();
-      }
+      // Always trigger REST fetch to guarantee perfect state synchronization
+      // (crucial if Firestore subscription is blocked/errored/offline)
+      await fetchChatsREST();
 
     } catch (err: any) {
       console.error('Error sending chat:', err);

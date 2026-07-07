@@ -10,7 +10,8 @@ import {
   ActivityLog 
 } from '../types';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+const isVercel = process.env.VERCEL === '1';
+const DATA_DIR = isVercel ? path.join('/tmp', 'data') : path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const GENERATED_DIR = path.join(DATA_DIR, 'generated');
 

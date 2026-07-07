@@ -8,9 +8,10 @@ import {
   ChevronRight, 
   ArrowRight,
   BookOpen,
-  Plus
+  Plus,
+  CornerDownLeft
 } from 'lucide-react';
-import { ChatMessage, MasterPlan } from '../types';
+import { ChatMessage } from '../types';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 
@@ -24,7 +25,7 @@ interface HomeViewProps {
 const MarkdownText: React.FC<{ text: string }> = ({ text }) => {
   const lines = text.split('\n');
   return (
-    <div className="space-y-2 text-sm leading-relaxed text-slate-300 font-sans">
+    <div className="space-y-2 text-sm leading-relaxed text-slate-200 font-sans">
       {lines.map((line, i) => {
         // Bullet points
         if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
@@ -79,7 +80,7 @@ const StreamingResponse: React.FC<{ text: string; onComplete?: () => void }> = (
         clearInterval(interval);
         if (onComplete) onComplete();
       }
-    }, 30); // smooth word-by-word typing effect
+    }, 20); // slick word-by-word typing effect
     
     return () => clearInterval(interval);
   }, [text]);
@@ -99,15 +100,15 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
   const [lastModelMsgId, setLastModelMsgId] = useState<string | null>(null);
   const [completedStreams, setCompletedStreams] = useState<Record<string, boolean>>({});
   
-  // Suggested templates (Phase 1)
+  // Suggested templates (ChatGPT clone starter templates)
   const SUGGESTED_PROMPTS = [
-    { label: '/plan Ek modern resume website', sub: 'Generate master plan' },
-    { label: '/wiki MAMTA AI System Architecture', sub: 'Query system architecture' }
+    { label: '/plan Resume website', sub: 'Generate structural master plan' },
+    { label: '/wiki MAMTA AI Architecture', sub: 'Learn about core intelligence system' }
   ];
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Phase 9: Subscribe to real-time chats from Firestore
+  // Subscribe to real-time chats from Firestore (Phase 10: Sync context)
   useEffect(() => {
     if (!sessionId) return;
 
@@ -159,6 +160,7 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
     }
   }, [sessionId]);
 
+  // Phase 7: Auto scroll system
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isThinking]);
@@ -174,8 +176,28 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
     }
   };
 
+  // Phase 5 & 9: Brain integration & Performance (IsSending block)
   const handleSendMessage = async (textToSend: string) => {
-    if (!textToSend.trim() || isThinking) return;
+    const trimmedInput = textToSend.trim();
+    if (!trimmedInput || isThinking) return;
+
+    // Phase 6: Execution control (Intercept build & run commands)
+    const lowerInput = trimmedInput.toLowerCase();
+    if (trimmedInput.startsWith('/build') || trimmedInput.startsWith('/run') || lowerInput === 'build app' || lowerInput === 'run app') {
+      setInput('');
+      const blockedMsg: ChatMessage = {
+        id: 'block-' + Date.now(),
+        sessionId,
+        role: 'model',
+        content: `⚠️ **Execution Blocked on Home Tab**
+        
+Execution triggers and builds are only available in the Workspace tab. Please switch to the Workspace view to run, compile, or build applications.`,
+        timestamp: new Date().toISOString(),
+        pageSource: 'home'
+      };
+      setMessages(prev => [...prev, blockedMsg]);
+      return;
+    }
 
     setInput('');
     setIsThinking(true);
@@ -186,7 +208,7 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId,
-          content: textToSend,
+          content: trimmedInput,
           pageSource: 'home'
         })
       });
@@ -203,26 +225,15 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
 
     } catch (err: any) {
       console.error('Error sending chat:', err);
-      // Insert custom local error if network fails
       const errorMessage = err.message || 'Unknown network error occurred';
       const errorChatMsg: ChatMessage = {
         id: 'err-' + Date.now(),
         sessionId,
         role: 'model',
         content: `⚠️ **Mamta AI Connection Error**
-
-Mujhe response generate karne me issue aa raha hai.
-
-**Sambhavit Kaaran (Possible Reasons):**
-1. Agar aap isko **Vercel** par chala rahe hain, to kya aapne Vercel Project settings me **\`GEMINI_API_KEY\`** aur relevant **Firebase Credentials** configure kiye hain?
-2. AI Studio me credentials automatic handle hote hain, par Vercel par aapko ye manual set karne padte hain.
-
-**Technical Error Message:**
-\`\`\`text
-${errorMessage}
-\`\`\`
-
-*Kripya apne Vercel Settings -> Environment Variables me \`GEMINI_API_KEY\` aur dusre \`FIREBASE_*\` variables check karein.*`,
+        
+Mujhe response generate karne me issue aa raha hai. Vercel environment configurations check karein.
+Technical details: \`${errorMessage}\``,
         timestamp: new Date().toISOString(),
         pageSource: 'home'
       };
@@ -247,7 +258,6 @@ ${errorMessage}
     }
   };
 
-  // Triggers backend blueprint generation and redirects to Workspace IDE (Phase 1 Special Logic)
   const handleTriggerPlanCreation = async (userIdea: string) => {
     setIsThinking(true);
     try {
@@ -262,7 +272,6 @@ ${errorMessage}
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       
-      // Auto-select generated plan and redirect user
       onSelectPlan(data.id);
       setActiveTab('workspace');
     } catch (err: any) {
@@ -274,95 +283,101 @@ ${errorMessage}
   };
 
   return (
-    <div id="home_core_pane" className="flex flex-col items-center justify-between h-[calc(100vh-105px)] lg:h-[calc(100vh-50px)] max-w-3xl mx-auto w-full px-4 py-4 relative">
+    <div id="home_core_pane" className="flex flex-col h-[calc(100vh-100px)] lg:h-[calc(100vh-40px)] w-full max-w-4xl mx-auto px-4 lg:px-6 py-2 relative">
       
-      {/* Top Header Controls */}
-      <div className="w-full flex items-center justify-between border-b border-slate-900 pb-3">
+      {/* Phase 1: Minimal Navbar Header */}
+      <div className="w-full flex items-center justify-between border-b border-slate-900/60 pb-3 mb-2 shrink-0">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
-          <span className="text-xs font-semibold tracking-wider text-slate-400 uppercase font-mono">MAMTA AI Core</span>
+          <div className="relative flex items-center justify-center w-6 h-6 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+          </div>
+          <div>
+            <h2 className="text-xs font-bold tracking-wider text-slate-200 uppercase font-mono flex items-center gap-1.5">
+              Mamta AI V7.6
+              <span className="text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1 rounded-md lowercase normal-case">brain online</span>
+            </h2>
+          </div>
         </div>
         
         {messages.length > 0 && (
           <button 
             id="clear_chat_history_btn"
             onClick={handleClearHistory}
-            className="p-1.5 rounded bg-slate-900/60 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-100 transition-all cursor-pointer flex items-center gap-1.5 text-[10px]"
+            className="p-1.5 rounded-lg bg-slate-900/40 hover:bg-slate-900 border border-slate-900 hover:border-slate-800 text-slate-400 hover:text-slate-200 transition-all cursor-pointer flex items-center gap-1.5 text-[10px]"
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Clear Conversation</span>
+            <Trash2 className="w-3.5 h-3.5 text-rose-500/80" />
+            <span>Clear History</span>
           </button>
         )}
       </div>
 
-      {/* Main Chat Stream Container */}
-      <div className="flex-1 w-full overflow-y-auto py-6 space-y-6 custom-scrollbar scroll-smooth pr-1">
+      {/* Phase 1 & 8: Conversation Space & Smooth Mobile Scroll */}
+      <div className="flex-1 w-full overflow-y-auto space-y-6 custom-scrollbar scroll-smooth pr-1 pb-24">
         
+        {/* ChatGPT Empty State (Minimal Starter cards) */}
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center text-center py-20 space-y-6 select-none">
+          <div className="flex flex-col items-center justify-center text-center py-20 lg:py-28 space-y-6 select-none animate-[fadeIn_0.4s_ease]">
             <div className="relative">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/5">
-                <Bot className="w-6 h-6 animate-pulse" />
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500/10 to-teal-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/5">
+                <Bot className="w-7 h-7" />
               </div>
-              <div className="absolute inset-0 bg-emerald-500/10 blur-xl rounded-full -z-10" />
+              <div className="absolute inset-0 bg-emerald-500/15 blur-2xl rounded-full -z-10" />
             </div>
 
-            <div className="max-w-md space-y-1">
-              <h2 className="text-lg font-bold text-slate-100 tracking-tight font-display">How can I help you today?</h2>
-              <p className="text-xs text-slate-500">
-                Ask a quick question, search OpenWiki, or generate a development plan.
+            <div className="max-w-md space-y-1.5">
+              <h2 className="text-xl font-bold text-slate-100 tracking-tight font-display">How can I help you today?</h2>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                MAMTA AI has a real-time responsive brain synced with Firestore. Let's design, code, or talk!
               </p>
             </div>
 
-            {/* suggested templates */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl text-left pt-2">
+            {/* Template shortcuts */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full max-w-lg text-left pt-3">
               {SUGGESTED_PROMPTS.map((prompt, idx) => (
                 <button
                   key={idx}
                   onClick={() => handleSendMessage(prompt.label)}
-                  className="p-3 rounded-xl bg-slate-900/40 border border-slate-900 hover:border-emerald-500/30 hover:bg-slate-900/80 text-left transition-all duration-300 group cursor-pointer animate-[fadeIn_0.3s_ease]"
+                  className="p-3.5 rounded-xl bg-slate-900/30 border border-slate-900 hover:border-emerald-500/30 hover:bg-slate-900/60 text-left transition-all duration-300 group cursor-pointer"
                 >
                   <p className="text-xs font-semibold text-emerald-400 group-hover:text-emerald-300 flex items-center justify-between">
                     {prompt.label}
                     <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
                   </p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">{prompt.sub}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">{prompt.sub}</p>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Message Bubble Mapping */}
+        {/* Phase 2: Message Bubble Mapping with left/right styling */}
         {messages.map((msg, idx) => {
           const isAI = msg.role === 'model';
           const isLatestAI = isAI && msg.id === lastModelMsgId;
           const isStreamCompleted = completedStreams[msg.id];
           const shouldStream = isLatestAI && !isStreamCompleted;
 
-          // Check if message content indicates planning or workspace redirects
           const contentLower = msg.content.toLowerCase();
           const hasPlanKeyword = contentLower.includes('plan') || contentLower.includes('blueprint') || contentLower.includes('roadmap') || contentLower.includes('task');
-          const isExecutionBlockMsg = msg.content.includes('Execution is only available in Workspace');
+          const isExecutionBlockMsg = msg.content.includes('Execution Blocked') || msg.content.includes('Execution is only available');
 
           return (
             <div 
               key={msg.id || idx}
-              className={`flex gap-4 max-w-2xl mx-auto ${isAI ? '' : 'flex-row-reverse'}`}
+              className={`flex gap-3.5 max-w-3xl mx-auto ${isAI ? 'justify-start' : 'justify-end'}`}
             >
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
-                isAI 
-                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 shadow-inner' 
-                  : 'bg-slate-900 border-slate-800 text-slate-300'
-              }`}>
-                {isAI ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
-              </div>
+              {isAI && (
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 shadow-inner">
+                  <Bot className="w-4 h-4" />
+                </div>
+              )}
               
-              <div className="flex-1 space-y-3">
-                <div className={`p-4 rounded-2xl border ${
+              <div className={`flex flex-col space-y-2 max-w-[85%] ${isAI ? 'items-start' : 'items-end'}`}>
+                {/* Phase 2 bubble details */}
+                <div className={`p-4 rounded-2xl ${
                   isAI
-                    ? 'bg-slate-900/20 border-slate-900/40 text-slate-200'
-                    : 'bg-slate-900/80 border-slate-900 text-slate-200 shadow-sm'
+                    ? 'bg-slate-900/40 border border-slate-900 text-slate-100 font-sans'
+                    : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-50'
                 }`}>
                   {shouldStream ? (
                     <StreamingResponse 
@@ -374,12 +389,12 @@ ${errorMessage}
                   )}
                 </div>
 
-                {/* Inline Action Card if a Master Plan is referenced (Phase 6 Plan Transfer System) */}
+                {/* Inline Action Card if a Master Plan is referenced */}
                 {isAI && hasPlanKeyword && !isExecutionBlockMsg && (
-                  <div className="border border-emerald-500/20 bg-emerald-500/5 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-[fadeIn_0.3s_ease]">
+                  <div className="border border-emerald-500/10 bg-emerald-500/5 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-4 animate-[fadeIn_0.3s_ease] w-full max-w-xl">
                     <div className="flex items-start gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
-                        <BookOpen className="w-4 h-4" />
+                      <div className="w-7 h-7 rounded bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
+                        <BookOpen className="w-3.5 h-3.5" />
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-slate-200">Send to Workspace Core</p>
@@ -388,20 +403,20 @@ ${errorMessage}
                     </div>
                     <button
                       onClick={() => handleTriggerPlanCreation(messages[idx - 1]?.content || msg.content)}
-                      className="shrink-0 w-full sm:w-auto px-4 py-2.5 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/15 transition-all duration-200 hover:scale-[1.02]"
+                      className="shrink-0 w-full sm:w-auto px-3.5 py-2 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-200 hover:scale-[1.02]"
                     >
                       <ArrowRight className="w-3.5 h-3.5" />
-                      <span>Send to Workspace</span>
+                      <span>Workspace</span>
                     </button>
                   </div>
                 )}
 
-                {/* Inline Action Card if Execution Block is triggered (Phase 5) */}
+                {/* Inline Action Card if Execution Block is triggered (Phase 6 redirection) */}
                 {isAI && isExecutionBlockMsg && (
-                  <div className="border border-teal-500/20 bg-teal-500/5 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-[fadeIn_0.3s_ease]">
+                  <div className="border border-teal-500/15 bg-teal-500/5 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-4 animate-[fadeIn_0.3s_ease] w-full max-w-xl">
                     <div className="flex items-start gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 shrink-0 mt-0.5">
-                        <Plus className="w-4 h-4" />
+                      <div className="w-7 h-7 rounded bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 shrink-0 mt-0.5">
+                        <Plus className="w-3.5 h-3.5" />
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-slate-200">Access Workspace IDE</p>
@@ -410,7 +425,7 @@ ${errorMessage}
                     </div>
                     <button
                       onClick={() => setActiveTab('workspace')}
-                      className="shrink-0 w-full sm:w-auto px-4 py-2.5 text-xs font-semibold rounded-lg bg-teal-500 hover:bg-teal-600 text-slate-950 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-teal-500/15 transition-all duration-200 hover:scale-[1.02]"
+                      className="shrink-0 w-full sm:w-auto px-3.5 py-2 text-xs font-semibold rounded-lg bg-teal-500 hover:bg-teal-600 text-slate-950 flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-200 hover:scale-[1.02]"
                     >
                       <ArrowRight className="w-3.5 h-3.5" />
                       <span>Open Workspace</span>
@@ -418,19 +433,27 @@ ${errorMessage}
                   </div>
                 )}
               </div>
+
+              {!isAI && (
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 flex items-center justify-center shrink-0">
+                  <User className="w-4 h-4" />
+                </div>
+              )}
             </div>
           );
         })}
 
-        {/* Thinking Indicator */}
+        {/* Phase 4: Typing Effect (Bouncy dots animation) */}
         {isThinking && (
-          <div className="flex gap-4 max-w-2xl mx-auto">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 animate-pulse shrink-0">
-              <Bot className="w-4 h-4" />
+          <div className="flex gap-3.5 max-w-3xl mx-auto justify-start">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+              <Bot className="w-4 h-4 animate-pulse" />
             </div>
-            <div className="p-4 rounded-2xl bg-slate-900/20 border border-slate-900/40 text-slate-400 flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-              <span className="text-xs font-medium tracking-wide animate-pulse">MAMTA AI processing stream...</span>
+            <div className="p-3 px-4 rounded-2xl bg-slate-900/20 border border-slate-900/40 text-slate-400 flex items-center gap-1.5">
+              <span className="text-[10px] tracking-wider text-slate-500 uppercase font-mono animate-pulse mr-1">Thinking</span>
+              <span className="w-1.5 h-1.5 bg-emerald-400/80 rounded-full animate-[bounce_1.4s_infinite_0s]" />
+              <span className="w-1.5 h-1.5 bg-emerald-400/80 rounded-full animate-[bounce_1.4s_infinite_0.2s]" />
+              <span className="w-1.5 h-1.5 bg-emerald-400/80 rounded-full animate-[bounce_1.4s_infinite_0.4s]" />
             </div>
           </div>
         )}
@@ -438,32 +461,41 @@ ${errorMessage}
         <div ref={chatEndRef} />
       </div>
 
-      {/* Centered Input Area at Bottom (Phase 1) */}
-      <div className="w-full pt-4">
+      {/* Phase 1 & 8: Sticky Bottom Input Bar with zero viewport issues */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent pt-4 pb-4 px-4 lg:px-6 shrink-0 z-20">
         <form 
           onSubmit={(e) => {
             e.preventDefault();
             if (input.trim()) handleSendMessage(input);
           }}
-          className="relative max-w-2xl mx-auto"
+          className="relative max-w-3xl mx-auto"
         >
           <input
             id="home_chat_input_field"
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="kuch bhi poochiye ya project suggest kijiye (e.g. '/plan smart weather widget')..."
-            className="w-full bg-slate-900/80 border border-slate-900 hover:border-slate-800 focus:border-emerald-500/50 rounded-2xl pl-4 pr-12 py-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 shadow-xl transition-all duration-300"
+            placeholder="Ask me anything... (e.g., 'namaste mamta! prepare a simple resume app plan')"
+            className="w-full bg-slate-900/70 border border-slate-900 hover:border-slate-800 focus:border-emerald-500/50 rounded-2xl pl-4 pr-14 py-3.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 shadow-2xl transition-all duration-300"
           />
-          <button
-            id="home_chat_send_btn"
-            type="submit"
-            disabled={!input.trim() || isThinking}
-            className="absolute right-2 top-2 p-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 transition-all duration-200 disabled:opacity-30 disabled:hover:bg-emerald-500 disabled:cursor-not-allowed cursor-pointer"
-          >
-            <Send className="w-3.5 h-3.5" />
-          </button>
+          <div className="absolute right-2 top-2 flex items-center gap-1.5">
+            <span className="hidden sm:flex items-center gap-0.5 text-[8.5px] font-mono text-slate-600 px-1.5 py-1 bg-slate-950/80 border border-slate-900 rounded">
+              <span>Enter</span>
+              <CornerDownLeft className="w-2.5 h-2.5 text-slate-500" />
+            </span>
+            <button
+              id="home_chat_send_btn"
+              type="submit"
+              disabled={!input.trim() || isThinking}
+              className="p-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 transition-all duration-200 disabled:opacity-30 disabled:hover:bg-emerald-500 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center"
+            >
+              <Send className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </form>
+        <p className="text-[9px] text-slate-600 text-center mt-2 font-mono">
+          MAMTA AI can generate plans, decompose items, and sync securely with Firestore.
+        </p>
       </div>
 
     </div>

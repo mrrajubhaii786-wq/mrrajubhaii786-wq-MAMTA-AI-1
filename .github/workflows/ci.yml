@@ -15,12 +15,7 @@ jobs:
         with:
           node-version: '24'
       - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
+        run: npm install
       - run: npm run lint
       - run: npm test -- --coverage
       - uses: codecov/codecov-action@v4

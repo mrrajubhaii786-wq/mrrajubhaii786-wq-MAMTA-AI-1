@@ -2,35 +2,46 @@ export class MindsetEngine {
   detectIntent(input: string): string {
     const text = input.toLowerCase().trim();
 
-    if (text.includes("plan") || text.includes("blueprint") || text.includes("roadmap") || text.startsWith("/plan")) {
-      return "planning";
-    }
-    if (text.includes("build") || text.includes("create") || text.includes("code") || text.includes("program") || text.startsWith("/build")) {
-      return "developer";
-    }
-    if (text.includes("error") || text.includes("bug") || text.includes("fix") || text.includes("fail") || text.includes("issue")) {
-      return "debug";
-    }
-    if (text.includes("why") || text.includes("reason") || text.includes("explain") || text.includes("how come")) {
-      return "reasoning";
-    }
-    if (text.includes("how") || text.includes("learn") || text.includes("tutorial")) {
-      return "learning";
+    if (
+      text.includes("कैसे") ||
+      text.includes("क्यों") ||
+      text.includes("क्या") ||
+      text.includes("how") ||
+      text.includes("why") ||
+      text.includes("universe") ||
+      text.includes("life") ||
+      text.includes("science") ||
+      text.includes("origin")
+    ) {
+      return "REASONING"; // 🔥 FIX
     }
 
-    return "chat";
+    if (
+      text.includes("plan") || 
+      text.includes("build") || 
+      text.includes("create") || 
+      text.startsWith("/plan") || 
+      text.startsWith("/build")
+    ) {
+      return "PLAN";
+    }
+
+    return "CHAT";
   }
 
   getMindset(intent: string): string {
     const map: Record<string, string> = {
+      DEVELOPER: "DEV",
       developer: "DEV",
-      debug: "DEBUGGER",
-      reasoning: "SCIENTIST",
+      PLAN: "STRATEGIST",
       planning: "STRATEGIST",
-      learning: "TEACHER",
+      REASONING: "SCIENTIST",
+      reasoning: "SCIENTIST",
+      CHAT: "CHAT",
       chat: "CHAT"
     };
 
-    return map[intent] || "CHAT";
+    return map[intent.toUpperCase()] || map[intent] || "CHAT";
   }
 }
+

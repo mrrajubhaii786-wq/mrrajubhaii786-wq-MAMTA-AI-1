@@ -102,6 +102,20 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
   const [isThinking, setIsThinking] = useState(false);
   const [lastModelMsgId, setLastModelMsgId] = useState<string | null>(null);
   const [completedStreams, setCompletedStreams] = useState<Record<string, boolean>>({});
+  const [pipelineEvent, setPipelineEvent] = useState<{
+    step: 'idle' | 'thinking' | 'planning' | 'executing' | 'verifying';
+    details?: string;
+    goal?: string;
+    plan?: { task: string; status: 'pending' | 'running' | 'completed' | 'failed' }[];
+    currentTaskIndex?: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = brain.subscribeToPipeline((event) => {
+      setPipelineEvent(event);
+    });
+    return () => unsubscribe();
+  }, [brain]);
 
   // V10 Autonomous Loop management
   const [autoLoop] = useState(() => new AutonomousLoop(brain));
@@ -453,6 +467,9 @@ Technical details: \`${errorMessage}\``,
           const hasPlanKeyword = contentLower.includes('plan') || contentLower.includes('blueprint') || contentLower.includes('roadmap') || contentLower.includes('task');
           const isExecutionBlockMsg = msg.content.includes('Execution Blocked') || msg.content.includes('Execution is only available');
 
+          const conversationIntent = brain.mindset.detectIntent(messages[idx - 1]?.content || msg.content);
+          const showWorkspaceButton = conversationIntent === 'planning' || conversationIntent === 'developer';
+
           return (
             <div 
               key={msg.id || idx}
@@ -482,7 +499,7 @@ Technical details: \`${errorMessage}\``,
                 </div>
 
                 {/* Inline Action Card if a Master Plan is referenced */}
-                {isAI && hasPlanKeyword && !isExecutionBlockMsg && (
+                {isAI && showWorkspaceButton && hasPlanKeyword && !isExecutionBlockMsg && (
                   <div className="border border-emerald-500/10 bg-emerald-500/5 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-4 animate-[fadeIn_0.3s_ease] w-full max-w-xl">
                     <div className="flex items-start gap-2.5">
                       <div className="w-7 h-7 rounded bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
@@ -535,8 +552,92 @@ Technical details: \`${errorMessage}\``,
           );
         })}
 
-        {/* Phase 4: Typing Effect (Bouncy dots animation) */}
-        {isThinking && (
+        {/* Phase 8: Real-Time Brain Pipeline Stepper */}
+        {isThinking && pipelineEvent && pipelineEvent.step !== 'idle' ? (
+          <div className="flex gap-3.5 max-w-3xl mx-auto justify-start animate-fade-in w-full">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+              <Bot className="w-4 h-4 animate-bounce" />
+            </div>
+            <div className="flex-1 bg-slate-900/50 border border-slate-900/80 p-4 rounded-2xl text-xs space-y-3 font-mono max-w-[85%]">
+              <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
+                <span className="text-[10px] font-bold text-emerald-400 tracking-wider uppercase">🧠 MAMTA BRAIN ACTIVE PROCESS</span>
+                <span className="text-[9px] text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800/80">Goal: {pipelineEvent.goal || "Analyzing"}</span>
+              </div>
+              
+              <div className="space-y-2">
+                {/* Step 1: Thinking */}
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] ${pipelineEvent.step === 'thinking' ? 'text-emerald-400 animate-pulse font-bold' : 'text-slate-400'}`}>
+                    {pipelineEvent.step === 'thinking' ? '●' : '✓'}
+                  </span>
+                  <span className={`text-[11px] ${pipelineEvent.step === 'thinking' ? 'text-emerald-300 font-semibold' : 'text-slate-500'}`}>
+                    {pipelineEvent.step === 'thinking' ? 'Thinking... (Neural Target Vector active)' : 'Thought Generated'}
+                  </span>
+                </div>
+
+                {/* Step 2: Planning */}
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] ${
+                    pipelineEvent.step === 'planning' 
+                      ? 'text-emerald-400 animate-pulse font-bold' 
+                      : (pipelineEvent.step === 'thinking' ? 'text-slate-700' : '✓')
+                  }`}>
+                    {pipelineEvent.step === 'planning' ? '●' : (pipelineEvent.step === 'thinking' ? '○' : '✓')}
+                  </span>
+                  <span className={`text-[11px] ${
+                    pipelineEvent.step === 'planning' 
+                      ? 'text-emerald-300 font-semibold' 
+                      : (pipelineEvent.step === 'thinking' ? 'text-slate-700' : 'text-slate-500')
+                  }`}>
+                    {pipelineEvent.step === 'planning' ? 'Planning... (Formulating task sequencing)' : (pipelineEvent.step === 'thinking' ? 'Plan Pending' : 'Strategic Plan Formulated')}
+                  </span>
+                </div>
+
+                {/* Step 3: Execution */}
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] ${
+                    pipelineEvent.step === 'executing' 
+                      ? 'text-emerald-400 animate-pulse font-bold' 
+                      : (['thinking', 'planning'].includes(pipelineEvent.step) ? 'text-slate-700' : '✓')
+                  }`}>
+                    {pipelineEvent.step === 'executing' ? '●' : (['thinking', 'planning'].includes(pipelineEvent.step) ? '○' : '✓')}
+                  </span>
+                  <span className={`text-[11px] ${
+                    pipelineEvent.step === 'executing' 
+                      ? 'text-emerald-300 font-semibold' 
+                      : (['thinking', 'planning'].includes(pipelineEvent.step) ? 'text-slate-700' : 'text-slate-500')
+                  }`}>
+                    {pipelineEvent.step === 'executing' ? 'Executing... (Worker Agents active)' : (['thinking', 'planning'].includes(pipelineEvent.step) ? 'Execution Pending' : 'Execution Complete')}
+                  </span>
+                </div>
+
+                {/* Step 4: Verification */}
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] ${
+                    pipelineEvent.step === 'verifying' 
+                      ? 'text-emerald-400 animate-pulse font-bold' 
+                      : (['thinking', 'planning', 'executing'].includes(pipelineEvent.step) ? 'text-slate-700' : '✓')
+                  }`}>
+                    {pipelineEvent.step === 'verifying' ? '●' : (['thinking', 'planning', 'executing'].includes(pipelineEvent.step) ? '○' : '✓')}
+                  </span>
+                  <span className={`text-[11px] ${
+                    pipelineEvent.step === 'verifying' 
+                      ? 'text-emerald-300 font-semibold' 
+                      : (['thinking', 'planning', 'executing'].includes(pipelineEvent.step) ? 'text-slate-700' : 'text-slate-500')
+                  }`}>
+                    {pipelineEvent.step === 'verifying' ? 'Verifying... (System Safety Audit)' : (['thinking', 'planning', 'executing'].includes(pipelineEvent.step) ? 'Verification Pending' : 'Safety Confirmed')}
+                  </span>
+                </div>
+              </div>
+
+              {pipelineEvent.details && (
+                <div className="text-[10px] bg-slate-950 p-2 rounded border border-slate-800/80 text-slate-300 italic">
+                  Status: {pipelineEvent.details}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : isThinking ? (
           <div className="flex gap-3.5 max-w-3xl mx-auto justify-start">
             <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
               <Bot className="w-4 h-4 animate-pulse" />
@@ -548,7 +649,7 @@ Technical details: \`${errorMessage}\``,
               <span className="w-1.5 h-1.5 bg-emerald-400/80 rounded-full animate-[bounce_1.4s_infinite_0.4s]" />
             </div>
           </div>
-        )}
+        ) : null}
 
         <div ref={chatEndRef} />
       </div>

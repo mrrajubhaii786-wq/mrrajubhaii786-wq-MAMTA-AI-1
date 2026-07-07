@@ -30,35 +30,26 @@ export class AutonomousLoop {
   public start() {
     if (this.running) return;
     this.running = true;
-    this.notify("Autonomous Loop Started");
-
-    // Run first loop iteration immediately
-    this.executeLoopIteration();
-
-    // Setup periodic task loop every 15 seconds for lightweight dashboard activity
-    this.intervalId = setInterval(() => {
-      if (this.running) {
-        this.executeLoopIteration();
-      }
-    }, 15000);
+    this.notify("Autonomous Loop Active");
+    this.loop();
   }
 
-  private async executeLoopIteration() {
-    this.notify("Autonomous: Thinking next goals...");
-    try {
-      const response = await this.brain.autoThink();
-      this.notify(`Completed: ${response.substring(0, 50)}...`);
-    } catch (e) {
-      this.notify("Autonomous: Idle / Standby");
+  private async loop() {
+    while (this.running) {
+      console.log("🤖 AUTO THINKING...");
+      this.notify("Autonomous: Thinking next goals...");
+      try {
+        const response = await this.brain.autoThink();
+        this.notify(`Completed: ${response.substring(0, 50)}...`);
+      } catch (e) {
+        this.notify("Autonomous: Idle / Standby");
+      }
+      await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
 
   public stop() {
     this.running = false;
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
     this.notify("Autonomous Loop Stopped");
   }
 

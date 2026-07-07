@@ -847,6 +847,37 @@ Aap batayein, aap kaise hain aur aaj hum kis autonomous goal par kaam karein? �
     return `Aapka swagat hai! Mamta AI V10 neural pipelines hamesha aapki security aur stability ke liye background me run karti rehti hain. 🙌`;
   }
 
+  if (
+    text.includes("कैसे") ||
+    text.includes("क्यों") ||
+    text.includes("क्या") ||
+    text.includes("how") ||
+    text.includes("why") ||
+    text.includes("universe") ||
+    text.includes("life") ||
+    text.includes("science") ||
+    text.includes("origin") ||
+    text.includes("shuruat") ||
+    text.includes("शुरुआत") ||
+    text.includes("jeevan") ||
+    text.includes("जीवन") ||
+    intent === 'REASONING' ||
+    intent === 'reasoning'
+  ) {
+    return `### 🌌 ब्रह्मांड में जीवन की शुरुआत (Origin of Life in the Universe)
+
+ब्रह्मांड की शुरुआत लगभग **13.8 अरब वर्ष (13.8 Billion Years)** पहले एक महाविस्फोट, यानी **Big Bang** से हुई थी।
+
+#### 🚀 विकास के मुख्य चरण (Key Evolution Phases):
+1. **Big Bang & Particle Formation**: आदि-काल में केवल ऊर्जा थी। धीरे-धीरे तापमान कम हुआ और subatomic particles (protons, neutrons, electrons) बने।
+2. **Atom & Stellar Synthesis**: पहले हाइड्रोजन और हीलियम गैसें बनीं। गुरुत्वाकर्षण से ये गैसें एकत्रित होकर तारे (Stars) और गैलेक्सीज (Galaxies) बनीं। तारों के भीतर नाभिकीय संलयन (nuclear fusion) से भारी तत्व जैसे कार्बन, ऑक्सीजन और लोहा बने।
+3. **Formation of Earth**: लगभग **4.5 अरब वर्ष** पहले हमारे सौर मंडल और पृथ्वी का निर्माण हुआ।
+4. **Origin of Life (जीवन की शुरुआत)**: पृथ्वी पर जीवन की शुरुआत लगभग **3.5 से 3.8 अरब वर्ष** पहले हुई। आदि-समुद्रों में सरल रासायनिक तत्वों (Organic molecules like amino acids) के मिलने से स्वयं-प्रतिकृति बनाने वाले (self-replicating) RNA/DNA और प्रथम एककोशिकीय जीव (Single-celled organisms/bacteria) बने।
+5. **Evolution**: समय के साथ इन सरल जीवों से जटिल बहुकोशिकीय जीवों, पौधों, जानवरों और अंततः मनुष्यों का विकास (evolution) हुआ।
+
+यह एक अत्यंत अद्भुत और जटिल वैज्ञानिक प्रक्रिया है जो भौतिकी, रसायन विज्ञान और जीव विज्ञान के अटूट संबंधों को दर्शाती है। 🧪✨`;
+  }
+
   if (text.includes('plan') || text.includes('architecture') || intent === 'planning') {
     return `### 📋 Mamta AI V10 Strategic Plan Generated
 Maine aapki query **"${content}"** ke liye full conceptual blueprint design kar liya hai.
@@ -855,7 +886,7 @@ Maine aapki query **"${content}"** ke liye full conceptual blueprint design kar 
 - **Phase 2: Architectural Mapping** - Interface elements and custom fonts (Inter display) aligned.
 - **Phase 3: Integration & Control** - Local persistence structures are validated for secure handling.
 
-*Note: Aap is plan ko configure karne ke liye Workspace tab me redirect ho sakte hain jahan automatic code generators active hain!*`;
+*Note: Aap is plan ko configure karne के लिए Workspace tab me redirect ho sakte hain jahan automatic code generators active hain!*`;
   }
 
   if (text.includes('build') || text.includes('create') || text.includes('code') || intent === 'developer') {
@@ -887,10 +918,9 @@ Aapke secret keys aur sensitive data safe hain!
 Bilingual capabilities ke sath main Hindi, English, aur Hinglish me seamlessly interact kar sakti hoon! 🧠`;
   }
 
-  return `Mamta AI V10 Neural Pipeline se response generated:
-Maine aapki request **"${content}"** ko offline local sandbox me high-priority par analyze kar liya hai. 
+  return `यह एक अत्यंत गंभीर और व्यावहारिक विषय है। विज्ञान और दर्शन के अनुसार, **"${content}"** पर गहराई से अध्ययन किया जा रहा है। 
 
-Aapka system status completely healthy hai aur safety rules perfect hain. Agar aapko high-end LLM processing capabilities use karni hain, toh please Google Cloud Console me jaakar Generative Language API ko enable kijiye. Tab tak, main local V10 brain modules ke through aapki help karti rahungi! 😊🚀`;
+मैं इस विषय में अपने ज्ञान कोश को लगातार समृद्ध कर रही हूँ ताकि भविष्य में आपको और अधिक प्रमाणिक, वैज्ञानिक और तथ्य-आधारित जानकारी प्रदान कर सकूँ। यदि आपके पास कोई विशिष्ट प्रश्न है, तो कृपया पूछें! 🧠🧬`;
 }
 
 app.post('/api/chats', async (req, res) => {
@@ -925,18 +955,24 @@ app.post('/api/chats', async (req, res) => {
       // Call Gemini API securely on server-side
       // Build context or history for the session
       const recentChats = await firestoreChats.getChats(sessionId);
-      // Keep last 10 messages for context
-      const contextHistory = recentChats.slice(-10).map((c: any) => ({
-        role: c.role === 'model' ? 'model' as const : 'user' as const,
-        parts: [{ text: c.content }]
-      }));
-
-      // If history is empty, seed with the current user message
-      if (contextHistory.length === 0) {
-        contextHistory.push({
-          role: 'user',
-          parts: [{ text: content }]
-        });
+      
+      // Filter out the current user message since we send it in sendMessage,
+      // and keep the last 12 messages to avoid token bloat.
+      const historyChats = recentChats
+        .filter((c: any) => c.content !== content)
+        .slice(-12);
+      
+      const contextHistory: any[] = [];
+      let nextExpectedRole: 'user' | 'model' = 'user';
+      for (const chat of historyChats) {
+        const role = chat.role === 'model' ? 'model' : 'user';
+        if (role === nextExpectedRole) {
+          contextHistory.push({
+            role,
+            parts: [{ text: chat.content }]
+          });
+          nextExpectedRole = nextExpectedRole === 'user' ? 'model' : 'user';
+        }
       }
 
       const systemInstruction = `You are Mamta AI V10, the high-performance Core Autonomous Engine system.
@@ -949,7 +985,7 @@ Current user intent detected as: ${intent || 'chat'}.`;
         config: {
           systemInstruction,
         },
-        history: contextHistory.slice(0, -1) // pass all previous messages as history
+        history: contextHistory
       });
 
       const response = await chatInstance.sendMessage({

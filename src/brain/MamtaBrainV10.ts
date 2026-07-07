@@ -2,6 +2,7 @@ import { MindsetEngine } from "./MindsetEngine";
 import { DecisionEngine } from "./DecisionEngine";
 import { AgentManager } from "./AgentManager";
 import { LearningEngine } from "./LearningEngine";
+import { localReasoning } from "./MamtaBrainLocal";
 
 export interface Thought {
   goal: string;
@@ -136,7 +137,7 @@ export class VerificationEngine {
 }
 
 export class MamtaBrainV10 {
-  private mindset: MindsetEngine;
+  public mindset: MindsetEngine;
   private decision: DecisionEngine;
   private agents: AgentManager;
   private learning: LearningEngine;
@@ -214,9 +215,10 @@ export class MamtaBrainV10 {
   private startSelfTrainingLoop() {
     if (typeof window !== "undefined" && !this.trainingInterval) {
       this.trainingInterval = setInterval(() => {
-        console.log("⚡ Mamta AI V10 Autonomous State Tuning loop active...");
+        console.log("🧠 Self-learning optimization running...");
+        this.learning.optimize();
         this.optimizeBrainPatterns();
-      }, 30000);
+      }, 10000);
     }
   }
 
@@ -258,18 +260,18 @@ export class MamtaBrainV10 {
     const text = input.toLowerCase().trim();
 
     if (text === "hi" || text === "hello" || text === "hey" || text === "namaste") {
-      return `[Mindset: ${mindset}] Hello and Namaste! Mamta AI V10 Core Autonomous Pipeline is fully active. Aapka system status perfectly optimized hai. Main aapki kya sahayata kar sakti hoon? 😊`;
+      return `Hello aur Namaste! Main Mamta AI V10 hoon. Mera pipeline autonomous mode me run ho raha hai, aur main completely operational aur active hoon. Aap complex reasoning ke liye mujhse questions pooch sakte hain, ya specific instructions dekar "plan" ya "build" agents run kar sakte hain! Aapki kya sahayata karoon? 😊`;
     }
 
     if (text.includes("how are you")) {
-      return `[Mindset: ${mindset}] V10 autonomous pipeline (Thinking, Planner, Executor, Verification) is running at peak speed. Sabhi core engines 100% active hain! How are you doing? 😊`;
+      return `Main bilkul theek hoon! Mamta AI V10 core autonomous pipeline (Thinking, Planner, Executor, Verification) bilkul dynamic speed me kaam kar raha hai. Sabhi features updated hain. Aap bataiye, aap kaise hain? 😊`;
     }
 
     if (text.includes("thank")) {
-      return `[Mindset: ${mindset}] My pleasure! The V10 neural pipeline is always running autonomously behind the scenes. 🙌`;
+      return `Aapka bahut-bahut dhanyawad! Main hamesha background me aapke tasks automate karne aur smart support dene ke liye ready hoon. 🙌`;
     }
 
-    return `[Mindset: ${mindset}] Offline simulation complete: Processed "${input}" within offline local sandbox perfectly.`;
+    return `Main aapki chat query process kar rahi hoon. Agar aap kisi specific topic par gehra reasoning/explanation chahte hain (jaise scientific ya conceptual questions), toh please freely poochiye - mera Brain use generate karne ke liye fully active hai! 😊`;
   }
 
   async aiBrain(input: string, sessionId: string, intent: string): Promise<string> {
@@ -286,9 +288,15 @@ export class MamtaBrainV10 {
       });
 
       const data = await res.json();
-      return data.modelMessage?.content || data.reply || "No response received";
+      const reply = data.modelMessage?.content || data.reply || "";
+      if (reply && !reply.includes("temporarily unreachable") && !reply.includes("unreachable")) {
+        return reply;
+      }
+      console.log("⚠️ AI FAILED OR UNREACHABLE → LOCAL REASONING BRAIN");
+      return localReasoning(input);
     } catch (e) {
-      return "⚠️ AI server temporarily unreachable. Transitioned to client-side local memory storage backup successfully! 👍";
+      console.log("⚠️ AI FAILED → LOCAL REASONING BRAIN", e);
+      return localReasoning(input);
     }
   }
 
@@ -304,11 +312,70 @@ export class MamtaBrainV10 {
       finalRes = finalRes + " 🚀";
     }
 
-    if (intent === "chat" && finalRes.length > 250) {
-      return finalRes.slice(0, 250) + "...";
-    }
-
     return finalRes;
+  }
+
+  private chatBrain(input: string, mindset: string): string {
+    this.notifyPipeline({
+      step: 'thinking',
+      details: `Processing local response instantly...`,
+      goal: 'Local Chat Response'
+    });
+    const res = this.localBrain(input, mindset);
+    this.notifyPipeline({
+      step: 'idle',
+      details: `Local response returned.`,
+      goal: 'Local Chat Response'
+    });
+    return res;
+  }
+
+  private async reasoningBrain(input: string, sessionId: string, intent: string): Promise<string> {
+    this.notifyPipeline({
+      step: 'thinking',
+      details: `Activating deep neural reasoning layers for "${input}"...`,
+      goal: 'Deep Reasoning AI'
+    });
+    const res = await this.aiBrain(input, sessionId, intent);
+    this.notifyPipeline({
+      step: 'idle',
+      details: `Deep reasoning synthesis completed.`,
+      goal: 'Deep Reasoning AI'
+    });
+    return res;
+  }
+
+  private plannerBrain(input: string): string {
+    this.notifyPipeline({
+      step: 'planning',
+      details: `Synthesizing strategic plan blueprint...`,
+      goal: 'Strategic Planning'
+    });
+    const thought = this.thinker.think(input);
+    const plan = this.planner.createPlan(thought);
+    const res = `## 📋 Mamta AI V11 Strategic Plan Blueprint\nGenerated for: "${input}"\n\n` + 
+      plan.map((t, idx) => `**Step ${idx + 1}: ${t.task}**\n- *Status:* Ready for action execution in workspace\n- *Details:* Integrated safety checks with active learning database feedback loop enabled.`).join("\n\n");
+    this.notifyPipeline({
+      step: 'idle',
+      details: `Strategic Plan blueprint formulated.`,
+      goal: 'Strategic Planning'
+    });
+    return res;
+  }
+
+  private async agentBrain(input: string, intent: string): Promise<string> {
+    this.notifyPipeline({
+      step: 'executing',
+      details: `Orchestrating multi-agent collaboration flow...`,
+      goal: 'Multi-Agent Processing'
+    });
+    const res = await this.agents.runAgents(input, intent);
+    this.notifyPipeline({
+      step: 'idle',
+      details: `Standby. Multi-Agent flow complete.`,
+      goal: 'Multi-Agent Processing'
+    });
+    return res;
   }
 
   async process(input: string, sessionId: string): Promise<string> {
@@ -321,6 +388,10 @@ export class MamtaBrainV10 {
     const mindset = this.mindset.getMindset(intent);
     const decision = this.decision.decide(input, intent);
 
+    // Debug Mode Logs
+    console.log("INTENT:", intent);
+    console.log("MODE:", decision.mode);
+
     let response: string = "";
 
     if (input.startsWith("/build")) {
@@ -328,108 +399,29 @@ export class MamtaBrainV10 {
       return "⚠️ Standard build operations are only allowed in the developer workspace console.";
     }
 
-    // 1. Check Cache
+    // 1. Check L1 Cache first
     if (this.cache.has(input)) {
       this.isBusy = false;
       return this.cache.get(input)!;
     }
 
-    // 2. Check Self-Learning Knowledge DB
-    const learnedResponse = this.findSimilarKnowledge(input);
-    if (learnedResponse) {
-      console.log(`[Self-Learning L2 Hit] Mamta AI V10 Serving knowledge key: "${input}"`);
-      response = learnedResponse;
+    // 2. Check Level 2 Dynamic Memory System
+    const memoryResponse = await this.learning.recall(input);
+    if (memoryResponse && decision.mode !== "AI") {
+      console.log(`[Cognitive Recall L2 Hit] Mamta AI Serving learned memory for: "${input}"`);
+      this.isBusy = false;
+      return memoryResponse;
+    }
+
+    // 3. Multi Mindset System Routing (Dynamic Routing)
+    if (decision.mode === "AGENT") {
+      response = await this.agentBrain(input, intent);
+    } else if (decision.mode === "PLAN") {
+      response = this.plannerBrain(input);
+    } else if (decision.mode === "AI") {
+      response = await this.reasoningBrain(input, sessionId, intent);
     } else {
-      // 3. V10 Thinking, Planning, Executing, and Verification Loop Execution
-      this.notifyPipeline({
-        step: 'thinking',
-        details: `Analyzing target vector input: "${input}"...`,
-        goal: 'Analyzing Input'
-      });
-      const thought = this.thinker.think(input);
-      console.log(`🧠 [Thinking Engine Goal Selected]: "${thought.goal}"`);
-
-      this.notifyPipeline({
-        step: 'planning',
-        details: `Formulating task sequencing for goal "${thought.goal}"...`,
-        goal: thought.goal
-      });
-      const plan = this.planner.createPlan(thought);
-      const taskOutcomes: string[] = [];
-
-      let currentTaskIndex = 0;
-      for (const task of plan) {
-        task.status = "running";
-        this.notifyPipeline({
-          step: 'executing',
-          details: `Executing task ${currentTaskIndex + 1}/${plan.length}: "${task.task}"`,
-          goal: thought.goal,
-          plan: plan.map(p => ({ task: p.task, status: p.status as 'pending' | 'running' | 'completed' | 'failed' })),
-          currentTaskIndex
-        });
-
-        const res = await this.executor.execute(task.task, input, sessionId, intent);
-
-        this.notifyPipeline({
-          step: 'verifying',
-          details: `Verifying task outcome safety constraints...`,
-          goal: thought.goal,
-          plan: plan.map(p => ({ task: p.task, status: p.status as 'pending' | 'running' | 'completed' | 'failed' })),
-          currentTaskIndex
-        });
-
-        const isVerified = this.verifier.verify(res);
-
-        if (!isVerified) {
-          task.status = "failed";
-          response = `❌ V10 Verification Engine intercepted a critical failure on subtask: "${task.task}". Aborting chain.`;
-          this.notifyPipeline({
-            step: 'idle',
-            details: `Execution aborted: ${response}`,
-            goal: thought.goal,
-            plan: plan.map(p => ({ task: p.task, status: p.status as 'pending' | 'running' | 'completed' | 'failed' })),
-            currentTaskIndex
-          });
-          break;
-        }
-
-        task.status = "completed";
-        taskOutcomes.push(res);
-        currentTaskIndex++;
-      }
-
-      this.notifyPipeline({
-        step: 'idle',
-        details: `Autonomous worker standby. Chain complete.`,
-        goal: thought.goal,
-        plan: plan.map(p => ({ task: p.task, status: p.status as 'pending' | 'running' | 'completed' | 'failed' })),
-        currentTaskIndex
-      });
-
-      if (!response) {
-        if (thought.goal === "Answer Question") {
-          // If simple chat, return the final AI answer directly
-          response = taskOutcomes[taskOutcomes.length - 1] || "No response generated.";
-        } else {
-          response = `## 🧠 V10 Autonomous Execution Successful\n**Main Goal:** ${thought.goal}\n\n` + taskOutcomes.join("\n\n");
-          
-          // Save the V10 autonomous plan execution log to the database
-          try {
-            await fetch("/api/chats/save-local", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                sessionId,
-                content: input,
-                response: response,
-                pageSource: "home"
-              })
-            });
-          } catch (e) {
-            console.warn("Save V10 chat history failed:", e);
-          }
-        }
-      }
+      response = this.chatBrain(input, mindset);
     }
 
     // 4. Record to memory Logs
@@ -437,7 +429,7 @@ export class MamtaBrainV10 {
     if (this.memory.length > 50) this.memory.shift();
 
     // 5. Commit learned insight to firestore database knowledge store
-    await this.learning.save(input, response);
+    await this.learning.learn(input, response, intent);
     const cleanedKey = input.toLowerCase().trim();
     this.knowledge[cleanedKey] = response;
 

@@ -14,21 +14,42 @@ import {
   CheckCircle,
   TrendingUp,
   X,
-  FileText
+  FileText,
+  Brain,
+  Play,
+  Square,
+  Terminal,
+  RefreshCw,
+  Zap
 } from 'lucide-react';
 import { SystemMetrics, ActivityLog, WikiEntry } from '../types';
+import { MamtaBrain } from '../brain/MamtaBrain';
+import { AutonomousLoop } from '../brain/AutonomousLoop';
+import { db } from '../lib/firebase';
 
 interface AdminViewProps {
   sessionId: string;
 }
 
 export default function AdminView({ sessionId }: AdminViewProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'metrics' | 'wiki'>('metrics');
+  const [activeSubTab, setActiveSubTab] = useState<'metrics' | 'wiki' | 'autonomous'>('metrics');
   
   // States
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   
+  // V10 Autonomous Monitoring States
+  const [brain] = useState(() => new MamtaBrain());
+  const [autoLoop] = useState(() => new AutonomousLoop(brain));
+  const [isAutoActive, setIsAutoActive] = useState(false);
+  const [autoStatus, setAutoStatus] = useState("Autonomous Standby");
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([
+    `[${new Date().toLocaleTimeString()}] 🧠 V10 Core Booted. Thinking Engine online.`,
+    `[${new Date().toLocaleTimeString()}] 📡 Listening to local decision vectors and memory states.`
+  ]);
+  const [learnedKnowledge, setLearnedKnowledge] = useState<{ id: string; input: string; response: string; timestamp: number }[]>([]);
+  const [isDeletingNode, setIsDeletingNode] = useState<string | null>(null);
+
   // Wiki list and CRUD
   const [wikiEntries, setWikiEntries] = useState<WikiEntry[]>([]);
   const [wikiSearch, setWikiSearch] = useState('');
@@ -42,15 +63,32 @@ export default function AdminView({ sessionId }: AdminViewProps) {
     fetchMetrics();
     fetchLogs();
     fetchWiki();
+    fetchLearnedKnowledge();
+
+    const handleStatusUpdate = (status: string) => {
+      setAutoStatus(status);
+      setTerminalLogs(prev => [
+        `[${new Date().toLocaleTimeString()}] ⚙️ ${status}`,
+        ...prev.slice(0, 49) // Keep last 50 logs
+      ]);
+    };
+
+    autoLoop.subscribe(handleStatusUpdate);
 
     // Polling diagnostics every 10 seconds for real-time feel
     const interval = setInterval(() => {
       fetchMetrics();
       fetchLogs();
+      fetchLearnedKnowledge();
     }, 10000);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearInterval(interval);
+      autoLoop.unsubscribe(handleStatusUpdate);
+      autoLoop.stop();
+      brain.destroy();
+    };
+  }, [autoLoop]);
 
   const fetchMetrics = async () => {
     try {
@@ -79,6 +117,82 @@ export default function AdminView({ sessionId }: AdminViewProps) {
       setWikiEntries(data);
     } catch (err) {
       console.error('Failed to fetch wiki:', err);
+    }
+  };
+
+  const fetchLearnedKnowledge = async () => {
+    if (!db) return;
+    try {
+      const { collection, getDocs, orderBy, query, limit } = await import('firebase/firestore');
+      const q = query(collection(db, "knowledge"), orderBy("timestamp", "desc"), limit(100));
+      const snapshot = await getDocs(q);
+      const list: any[] = [];
+      snapshot.forEach(doc => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      setLearnedKnowledge(list);
+    } catch (err) {
+      console.warn('Failed to fetch learned knowledge from Firestore:', err);
+    }
+  };
+
+  const deleteKnowledgeNode = async (id: string) => {
+    if (!db) return;
+    if (!window.confirm("क्या आप सच में इस learned knowledge node को डिलीट करना चाहते हैं?")) return;
+    setIsDeletingNode(id);
+    try {
+      const { doc, deleteDoc } = await import('firebase/firestore');
+      await deleteDoc(doc(db, "knowledge", id));
+      setTerminalLogs(prev => [
+        `[${new Date().toLocaleTimeString()}] 🗑️ Deleted knowledge node ID: ${id}`,
+        ...prev
+      ]);
+      fetchLearnedKnowledge();
+    } catch (err) {
+      console.error('Failed to delete knowledge node:', err);
+    } finally {
+      setIsDeletingNode(null);
+    }
+  };
+
+  const triggerManualAction = async (goal: string) => {
+    setTerminalLogs(prev => [
+      `[${new Date().toLocaleTimeString()}] ⚡ Admin forced goal: "${goal}"`,
+      ...prev
+    ]);
+    setAutoStatus("Thinking...");
+    try {
+      const res = await brain.process(goal, sessionId);
+      setTerminalLogs(prev => [
+        `[${new Date().toLocaleTimeString()}] ✅ Goal execution completed. Node saved.`,
+        ...prev
+      ]);
+      fetchLearnedKnowledge();
+    } catch (err) {
+      setTerminalLogs(prev => [
+        `[${new Date().toLocaleTimeString()}] ❌ Execution failed: ${err}`,
+        ...prev
+      ]);
+    } finally {
+      setAutoStatus("Autonomous Standby");
+    }
+  };
+
+  const toggleAdminAuto = () => {
+    if (isAutoActive) {
+      autoLoop.stop();
+      setIsAutoActive(false);
+      setTerminalLogs(prev => [
+        `[${new Date().toLocaleTimeString()}] 🛑 Autonomous Action Loop stopped.`,
+        ...prev
+      ]);
+    } else {
+      autoLoop.start();
+      setIsAutoActive(true);
+      setTerminalLogs(prev => [
+        `[${new Date().toLocaleTimeString()}] 🚀 Autonomous Action Loop started! Listening for optimization triggers.`,
+        ...prev
+      ]);
     }
   };
 
@@ -188,9 +302,21 @@ export default function AdminView({ sessionId }: AdminViewProps) {
           <BookOpen className="w-3.5 h-3.5" />
           <span>OpenWiki Knowledge ({wikiEntries.length})</span>
         </button>
+        <button
+          id="admin_tab_autonomous_selector"
+          onClick={() => setActiveSubTab('autonomous')}
+          className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+            activeSubTab === 'autonomous' 
+              ? 'bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 font-bold font-mono' 
+              : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200 border border-transparent font-mono'
+          }`}
+        >
+          <Brain className="w-3.5 h-3.5 text-indigo-400" />
+          <span>V10 Autonomous Brain ({learnedKnowledge.length})</span>
+        </button>
       </div>
 
-      {activeSubTab === 'metrics' ? (
+      {activeSubTab === 'metrics' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 overflow-hidden">
           
           {/* Diagnostic Stats & Health Indicators (Left Column - 8/12) */}
@@ -347,9 +473,11 @@ export default function AdminView({ sessionId }: AdminViewProps) {
           </div>
 
         </div>
-      ) : (
+      )}
+
+      {activeSubTab === 'wiki' && (
         /* OPENWIKI KNOWLEDGE Tab Content */
-        <div className="flex flex-col flex-1 overflow-hidden h-[calc(100vh-140px)] space-y-3">
+        <div className="flex flex-col flex-1 overflow-hidden h-[calc(100vh-140px)] space-y-3 font-sans">
           
           {/* Wiki Search & Create Controls */}
           <div className="flex items-center justify-between gap-3.5 shrink-0 bg-slate-900/40 border border-slate-800/60 p-2.5 rounded-lg backdrop-blur-md">
@@ -436,7 +564,187 @@ export default function AdminView({ sessionId }: AdminViewProps) {
         </div>
       )}
 
-      {/* Wiki Create/Edit Modal popup overlay */}
+      {activeSubTab === 'autonomous' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 overflow-hidden h-[calc(100vh-140px)]">
+          
+          {/* Left Column: V10 Agent Orchestrator & Live Terminal */}
+          <div className="lg:col-span-6 flex flex-col bg-slate-900/60 border border-slate-800 rounded-xl p-4 backdrop-blur-md shadow-lg overflow-hidden h-full">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-indigo-400" />
+                <h3 className="text-sm font-semibold text-slate-100 font-mono">V10 Autonomous Worker</h3>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold font-mono border ${isAutoActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                  {isAutoActive ? "AUTO LOOP ACTIVE" : "AUTO STANDBY"}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Trigger Control buttons */}
+            <div className="grid grid-cols-2 gap-2.5 mb-3 shrink-0">
+              <button
+                onClick={toggleAdminAuto}
+                className={`py-2 px-3 rounded-lg border font-mono text-[11px] font-bold tracking-wider uppercase transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+                  isAutoActive 
+                    ? 'bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400' 
+                    : 'bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/30 text-indigo-400'
+                }`}
+              >
+                {isAutoActive ? (
+                  <>
+                    <Square className="w-3.5 h-3.5 fill-rose-400 text-rose-400" />
+                    <span>Stop Auto Engine</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5 fill-indigo-400 text-indigo-400" />
+                    <span>Start Auto Engine</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center gap-1 bg-slate-950/40 border border-slate-800/80 px-2.5 rounded-lg text-[10px] font-mono text-slate-400 justify-center leading-tight">
+                <span className={`w-1.5 h-1.5 rounded-full ${isAutoActive ? 'bg-emerald-400 animate-ping' : 'bg-amber-400 shrink-0'}`} />
+                <span className="truncate">{autoStatus}</span>
+              </div>
+            </div>
+
+            {/* Manual Action Force Box */}
+            <div className="bg-slate-950/30 border border-slate-850 rounded-xl p-3 mb-3 shrink-0">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono mb-2">⚡ Force Core Autonomous Action Tasks</p>
+              <div className="grid grid-cols-2 gap-1.5 font-mono">
+                <button
+                  onClick={() => triggerManualAction("optimize system")}
+                  disabled={autoStatus === "Thinking..."}
+                  className="py-1.5 px-2 bg-slate-900 hover:bg-slate-850 disabled:opacity-50 border border-slate-850 hover:border-slate-750 text-slate-300 rounded font-mono text-[10px] transition-all text-left flex items-center justify-between cursor-pointer"
+                >
+                  <span>🧠 Core System Optimize</span>
+                  <Zap className="w-3 h-3 text-amber-400" />
+                </button>
+                <button
+                  onClick={() => triggerManualAction("clean cache")}
+                  disabled={autoStatus === "Thinking..."}
+                  className="py-1.5 px-2 bg-slate-900 hover:bg-slate-850 disabled:opacity-50 border border-slate-850 hover:border-slate-750 text-slate-300 rounded font-mono text-[10px] transition-all text-left flex items-center justify-between cursor-pointer"
+                >
+                  <span>🧹 Purge L1 Memory Cache</span>
+                  <Zap className="w-3 h-3 text-cyan-400" />
+                </button>
+                <button
+                  onClick={() => triggerManualAction("build system logs")}
+                  disabled={autoStatus === "Thinking..."}
+                  className="py-1.5 px-2 bg-slate-900 hover:bg-slate-850 disabled:opacity-50 border border-slate-850 hover:border-slate-750 text-slate-300 rounded font-mono text-[10px] transition-all text-left flex items-center justify-between cursor-pointer"
+                >
+                  <span>📋 Collate Sub-Agent Reports</span>
+                  <Zap className="w-3 h-3 text-indigo-400" />
+                </button>
+                <button
+                  onClick={() => triggerManualAction("why sky blue")}
+                  disabled={autoStatus === "Thinking..."}
+                  className="py-1.5 px-2 bg-slate-900 hover:bg-slate-850 disabled:opacity-50 border border-slate-855 hover:border-slate-750 text-slate-300 rounded font-mono text-[10px] transition-all text-left flex items-center justify-between cursor-pointer"
+                >
+                  <span>💬 Generate Sample Node</span>
+                  <Zap className="w-3 h-3 text-emerald-400" />
+                </button>
+              </div>
+            </div>
+
+            {/* Terminal View */}
+            <div className="flex-1 flex flex-col bg-slate-950 border border-slate-850 rounded-xl overflow-hidden p-3 font-mono text-xs">
+              <div className="flex items-center justify-between text-slate-500 text-[10px] pb-2 mb-2 border-b border-slate-900 uppercase tracking-wider shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Mamta OS V10 Live Terminal</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-1.5 text-[11px] text-slate-400 custom-scrollbar pr-1 select-all">
+                {terminalLogs.map((log, index) => (
+                  <p key={index} className={log.includes('❌') ? 'text-rose-400 font-bold' : log.includes('✅') ? 'text-emerald-400 font-bold' : log.includes('⚡') ? 'text-indigo-400 font-bold' : log.includes('🗑️') ? 'text-amber-400 font-bold' : 'text-slate-300'}>
+                    {log}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Live Firestore Self-Learned Intelligence Nodes */}
+          <div className="lg:col-span-6 flex flex-col bg-slate-900/60 border border-slate-800 rounded-xl p-4 backdrop-blur-md shadow-lg overflow-hidden h-full">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-sm font-semibold text-slate-100 font-mono">L2 Firestore Knowledge Nodes ({learnedKnowledge.length})</h3>
+              </div>
+              <button 
+                onClick={fetchLearnedKnowledge}
+                className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
+                title="Force refresh database snapshot"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" style={{ animationDuration: '3s' }} />
+              </button>
+            </div>
+
+            {/* List scrollbar */}
+            <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-1">
+              {learnedKnowledge.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-500 border border-dashed border-slate-850 rounded-xl h-full font-mono text-center px-4">
+                  <Brain className="w-8 h-8 text-indigo-400 animate-bounce mb-2" />
+                  <p className="text-xs font-bold uppercase text-slate-400 tracking-wider">No learned entries detected</p>
+                  <p className="text-[10px] text-slate-600 mt-1 max-w-[250px]">Once the V10 auto engine or users communicate, learned responses are committed to Google Cloud Firestore persistently.</p>
+                </div>
+              ) : (
+                learnedKnowledge.map((node) => (
+                  <div key={node.id} className="bg-slate-950/60 border border-slate-850 rounded-xl p-3 hover:border-indigo-500/20 transition-all duration-300 group relative overflow-hidden">
+                    {/* Tiny visual node connectors */}
+                    <div className="absolute top-3 left-0 w-1 h-8 bg-gradient-to-b from-indigo-500 to-teal-500 rounded-r" />
+                    
+                    <div className="flex justify-between items-start gap-4 mb-1.5 pl-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 group-hover:animate-ping" />
+                        <span className="text-[10px] font-bold font-mono text-indigo-400 uppercase tracking-wide">Knowledge Node</span>
+                      </div>
+                      
+                      <button
+                        onClick={() => deleteKnowledgeNode(node.id)}
+                        disabled={isDeletingNode === node.id}
+                        className="p-1 rounded hover:bg-rose-950/40 text-slate-500 hover:text-rose-400 cursor-pointer opacity-0 group-hover:opacity-100 transition-all duration-200"
+                        title="Delete learned node from Firestore"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs pl-2">
+                      <div>
+                        <span className="text-slate-500 font-mono text-[9px] block uppercase font-bold tracking-wider">Vector Query Input:</span>
+                        <p className="text-slate-100 font-medium font-mono bg-slate-900/80 px-2 py-1 rounded border border-slate-850 mt-0.5 truncate">{node.input}</p>
+                      </div>
+
+                      <div>
+                        <span className="text-slate-500 font-mono text-[9px] block uppercase font-bold tracking-wider">Self-Formulated Response:</span>
+                        <div className="text-slate-300 text-[11px] leading-relaxed bg-slate-900/40 p-2 rounded border border-slate-900/60 mt-0.5 whitespace-pre-wrap font-sans max-h-48 overflow-y-auto custom-scrollbar">{node.response}</div>
+                      </div>
+
+                      {node.timestamp && (
+                        <div className="text-[8px] font-mono text-slate-600 text-right uppercase pt-1">
+                          Node synchronized: {new Date(node.timestamp).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+        </div>
+      )}
       {showWikiModal && (
         <div id="wiki_crud_modal_overlay" className="fixed inset-0 bg-slate-950/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 max-w-xl w-full shadow-2xl space-y-4 animate-in fade-in duration-200">

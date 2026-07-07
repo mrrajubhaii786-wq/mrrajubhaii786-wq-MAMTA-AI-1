@@ -283,7 +283,7 @@ Technical details: \`${errorMessage}\``,
           </div>
           <div>
             <h2 className="text-xs font-bold tracking-wider text-slate-200 uppercase font-mono flex items-center gap-1.5">
-              Mamta AI V8.0
+              Mamta AI V9.0
               <span className="text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1 rounded-md lowercase normal-case">brain online</span>
             </h2>
           </div>

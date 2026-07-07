@@ -15,6 +15,7 @@ import { ChatMessage } from '../types';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { MamtaBrain } from '../brain/MamtaBrain';
+import { AutonomousLoop } from '../brain/AutonomousLoop';
 
 interface HomeViewProps {
   sessionId: string;
@@ -101,6 +102,35 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
   const [isThinking, setIsThinking] = useState(false);
   const [lastModelMsgId, setLastModelMsgId] = useState<string | null>(null);
   const [completedStreams, setCompletedStreams] = useState<Record<string, boolean>>({});
+
+  // V10 Autonomous Loop management
+  const [autoLoop] = useState(() => new AutonomousLoop(brain));
+  const [autoStatus, setAutoStatus] = useState("Autonomous Idle");
+  const [isAutoActive, setIsAutoActive] = useState(false);
+
+  useEffect(() => {
+    const handleStatusUpdate = (status: string) => {
+      setAutoStatus(status);
+    };
+
+    autoLoop.subscribe(handleStatusUpdate);
+
+    return () => {
+      autoLoop.unsubscribe(handleStatusUpdate);
+      autoLoop.stop();
+      brain.destroy();
+    };
+  }, [autoLoop, brain]);
+
+  const toggleAutonomousMode = () => {
+    if (isAutoActive) {
+      autoLoop.stop();
+      setIsAutoActive(false);
+    } else {
+      autoLoop.start();
+      setIsAutoActive(true);
+    }
+  };
   
   // Suggested templates (ChatGPT clone starter templates)
   const SUGGESTED_PROMPTS = [
@@ -275,30 +305,51 @@ Technical details: \`${errorMessage}\``,
   return (
     <div id="home_core_pane" className="flex flex-col h-[calc(100vh-100px)] lg:h-[calc(100vh-40px)] w-full max-w-4xl mx-auto px-4 lg:px-6 py-2 relative">
       
-      {/* Phase 1: Minimal Navbar Header */}
-      <div className="w-full flex items-center justify-between border-b border-slate-900/60 pb-3 mb-2 shrink-0">
+      {/* Phase 1: Minimal Navbar Header & V10 Autonomous Control Center */}
+      <div className="w-full flex flex-col md:flex-row md:items-center justify-between border-b border-slate-900/60 pb-3 mb-2 shrink-0 gap-3">
         <div className="flex items-center gap-2">
-          <div className="relative flex items-center justify-center w-6 h-6 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+          <div className="relative flex items-center justify-center w-6 h-6 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
             <Sparkles className="w-3.5 h-3.5 animate-pulse" />
           </div>
           <div>
-            <h2 className="text-xs font-bold tracking-wider text-slate-200 uppercase font-mono flex items-center gap-1.5">
-              Mamta AI V9.0
-              <span className="text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1 rounded-md lowercase normal-case">brain online</span>
+            <h2 className="text-xs font-bold tracking-wider text-slate-100 uppercase font-mono flex items-center gap-1.5">
+              Mamta AI V10
+              <span className={`text-[9px] px-1.5 py-0.5 rounded-md uppercase font-bold tracking-wider font-mono border transition-all duration-300 ${isAutoActive ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30 animate-pulse' : 'text-slate-400 bg-slate-500/10 border-slate-500/20'}`}>
+                {isAutoActive ? 'autonomous action' : 'standby'}
+              </span>
             </h2>
           </div>
         </div>
-        
-        {messages.length > 0 && (
-          <button 
-            id="clear_chat_history_btn"
-            onClick={handleClearHistory}
-            className="p-1.5 rounded-lg bg-slate-900/40 hover:bg-slate-900 border border-slate-900 hover:border-slate-800 text-slate-400 hover:text-slate-200 transition-all cursor-pointer flex items-center gap-1.5 text-[10px]"
+
+        {/* Dynamic Live Loop Logs Status bar */}
+        <div className="flex items-center gap-3">
+          <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1.5 bg-slate-900/50 border border-slate-900 px-2 py-1 rounded-md">
+            <span className={`w-1.5 h-1.5 rounded-full ${isAutoActive ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
+            <span className="text-slate-300 truncate max-w-[200px]">{autoStatus}</span>
+          </div>
+
+          <button
+            onClick={toggleAutonomousMode}
+            className={`px-2.5 py-1 rounded-md border font-mono text-[10px] uppercase font-bold tracking-wider transition-all duration-300 cursor-pointer ${
+              isAutoActive 
+                ? 'bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400' 
+                : 'bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/30 text-indigo-400'
+            }`}
           >
-            <Trash2 className="w-3.5 h-3.5 text-rose-500/80" />
-            <span>Clear History</span>
+            {isAutoActive ? 'Stop Auto' : 'Start Auto'}
           </button>
-        )}
+          
+          {messages.length > 0 && (
+            <button 
+              id="clear_chat_history_btn"
+              onClick={handleClearHistory}
+              className="p-1.5 rounded-lg bg-slate-900/40 hover:bg-slate-900 border border-slate-900 hover:border-slate-800 text-slate-400 hover:text-slate-200 transition-all cursor-pointer flex items-center gap-1.5 text-[10px]"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-500/80" />
+              <span>Clear History</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Phase 1 & 8: Conversation Space & Smooth Mobile Scroll */}

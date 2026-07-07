@@ -786,7 +786,7 @@ app.get('/api/chats', async (req, res) => {
   }
 });
 
-// MAMTA AI V8.1 — LEGEND BRAIN SYSTEM (STANDALONE FRONTEND ROUTING INTEGRATED)
+// MAMTA AI V10 — CORE AUTONOMOUS SYSTEM (STANDALONE FRONTEND ROUTING INTEGRATED)
 
 app.post('/api/chats/save-local', async (req, res) => {
   const { sessionId, content, response, pageSource } = req.body;
@@ -872,7 +872,7 @@ app.post('/api/chats', async (req, res) => {
       });
     }
 
-    const systemInstruction = `You are Mamta AI V8.1, the high-performance Legend Brain system.
+    const systemInstruction = `You are Mamta AI V10, the high-performance Core Autonomous Engine system.
 Always reply in a warm, friendly, and bilingual language (mix of Hindi and English) if the user uses Hindi/Hinglish, or in professional English if requested.
 Maintain professional, fast, and stable responses.
 Current user intent detected as: ${intent || 'chat'}.`;

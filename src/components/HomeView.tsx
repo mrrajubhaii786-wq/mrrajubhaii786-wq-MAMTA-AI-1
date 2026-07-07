@@ -14,6 +14,7 @@ import {
 import { ChatMessage } from '../types';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { MamtaBrain } from '../brain/MamtaBrain';
 
 interface HomeViewProps {
   sessionId: string;
@@ -94,6 +95,7 @@ const StreamingResponse: React.FC<{ text: string; onComplete?: () => void }> = (
 };
 
 export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: HomeViewProps) {
+  const [brain] = useState(() => new MamtaBrain());
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
@@ -203,22 +205,10 @@ Execution triggers and builds are only available in the Workspace tab. Please sw
     setIsThinking(true);
 
     try {
-      const res = await fetch('/api/chats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          content: trimmedInput,
-          pageSource: 'home'
-        })
-      });
+      // Process through MamtaBrain on client side
+      const response = await brain.process(trimmedInput, sessionId);
 
-      const data = await res.json();
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      // REST fallback sync if snapshot fails
+      // REST fallback sync if snapshot fails (only if Firestore not active)
       if (!db) {
         fetchChatsREST();
       }

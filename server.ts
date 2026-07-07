@@ -1061,6 +1061,8 @@ Provide a clean, structured informational overview or query match from the syste
   }
 }
 
+const mamtaBrainInstance = new MamtaBrain();
+
 app.post('/api/chats', async (req, res) => {
   const { sessionId, content, pageSource } = req.body;
   if (!sessionId || !content) {
@@ -1084,7 +1086,7 @@ app.post('/api/chats', async (req, res) => {
     });
 
     // Process through MamtaBrain
-    const brain = new MamtaBrain();
+    const brain = mamtaBrainInstance;
     const result = await brain.process(content, sessionId, pageSource);
 
     // Save to brain memory

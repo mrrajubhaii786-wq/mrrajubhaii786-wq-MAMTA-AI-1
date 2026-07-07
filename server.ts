@@ -786,27 +786,54 @@ app.get('/api/chats', async (req, res) => {
   }
 });
 
-// MAMTA AI V7.4 — BRAIN SYSTEM MASTER PLAN
 // MAMTA AI V7.5 — BRAIN SYSTEM WITH CACHING & DYNAMIC ROUTING
-const brainCache = new Map<string, { content: string; intent: 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge'; isLocal: boolean }>();
+// MAMTA AI V8.0 — LEGEND BRAIN SYSTEM MASTER PLAN
+const brainCache = new Map<string, { content: string; intent: 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge' | 'reasoning' | 'learning'; isLocal: boolean }>();
 
 class MamtaBrain {
   private memory: any[] = [];
+  private isBusy: boolean = false;
 
   constructor() {
     this.memory = [];
   }
 
   // Phase 7: Memory System
-  saveMemory(msg: any) {
+  addMemory(msg: any) {
     this.memory.push(msg);
     if (this.memory.length > 20) {
       this.memory.shift();
     }
   }
 
-  // Phase 2: Intent Detection Engine
-  detectIntent(input: string): 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge' {
+  saveMemory(msg: any) {
+    this.addMemory(msg);
+  }
+
+  // Phase 1: Input Analyzer
+  analyzeInput(input: string) {
+    return {
+      text: input,
+      length: input.length,
+      hasCommand: input.startsWith("/"),
+      language: this.detectLang(input),
+    };
+  }
+
+  private detectLang(input: string): 'en' | 'hi' | 'bilingual' {
+    const text = input.toLowerCase();
+    const hindiKeywords = ["namaste", "kaise", "kya", "mera", "aap", "hai", "bhai", "yaar", "dost", "acha", "shukriya", "dhanyawad", "zaroor", "bilkul"];
+    let hindiMatches = 0;
+    for (const word of hindiKeywords) {
+      if (text.includes(word)) hindiMatches++;
+    }
+    if (hindiMatches > 1) return 'hi';
+    if (hindiMatches === 1) return 'bilingual';
+    return 'en';
+  }
+
+  // Phase 2: Intent Engine
+  detectIntent(input: string): 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge' | 'reasoning' | 'learning' {
     const text = input.toLowerCase().trim();
 
     if (text.includes("plan") || text.startsWith("/plan") || text.includes("architecture") || text.includes("blueprint") || text.includes("roadmap")) {
@@ -818,6 +845,12 @@ class MamtaBrain {
     if (text.includes("error") || text.includes("fix") || text.includes("debug") || text.includes("issue")) {
       return "debug";
     }
+    if (text.includes("why")) {
+      return "reasoning";
+    }
+    if (text.includes("how")) {
+      return "learning";
+    }
     if (text.includes("what") || text.startsWith("/wiki")) {
       return "knowledge";
     }
@@ -825,20 +858,27 @@ class MamtaBrain {
     return "chat";
   }
 
-  // Phase 2: Smart Routing Engine
-  shouldUseLocal(intent: string, input: string): boolean {
+  // Phase 3: Brain Router
+  route(input: string, intent: string): "LOCAL" | "AI" {
+    if (this.useLocal(intent, input)) {
+      return "LOCAL";
+    }
+    return "AI";
+  }
+
+  useLocal(intent: string, input: string): boolean {
     const text = input.toLowerCase().trim();
     if (intent === "chat" && input.length < 25) return true;
     if (text.startsWith("/help")) return true;
-    if (text.startsWith("/build") || text.startsWith("/run") || text === "build app" || text === "run app") return true;
+    if (text === "hi" || text === "hello" || text === "hey" || text === "namaste") return true;
     return false;
   }
 
-  // Phase 2: Human-Like Local Responses
-  localResponse(input: string, intent: string): string {
+  // Phase 4: Local Intelligence Engine
+  localBrain(input: string, intent: string): string {
     const text = input.toLowerCase().trim();
 
-    // Prevent execution in Home (Strict Execution Block)
+    // Phase 10: Block System / Execution Control
     if (text.startsWith("/build") || text.startsWith("/run") || text === "build app" || text === "run app") {
       return "⚠️ Execution is only available in Workspace.\nClick 'Open Workspace' to continue.";
     }
@@ -850,17 +890,6 @@ class MamtaBrain {
     if (text.includes("hi") || text === "hello" || text === "hey" || text === "namaste") {
       return "Hi 👋 What are you building today?";
     }
-
-    if (intent === "chat") {
-      return this.chatMode(input);
-    }
-
-    return "Interesting 🤔 Tell me more.";
-  }
-
-  // Chat Mode Fallback
-  chatMode(input: string): string {
-    const text = input.toLowerCase().trim();
 
     if (text.includes("how are you")) {
       return "I'm doing great 😊 What about you?";
@@ -874,16 +903,16 @@ class MamtaBrain {
       return "Goodbye! Have an amazing day ahead! 😊";
     }
 
-    return "Interesting 🤔 Tell me more.";
+    return "Got it 👍 Tell me more.";
   }
 
-  // Phase 3: AI Fallback System
-  fallbackResponse(input: string): string {
-    return "⚠️ AI is busy, but I'm still here.";
+  // Phase 6: Failsafe System
+  fallback(input: string): string {
+    return "⚠️ AI is busy, but I'm still here 👍";
   }
 
-  // Phase 4: AI Engine (Smart Call)
-  async aiResponse(input: string, intent: string, sessionId: string, pageSource?: string): Promise<string> {
+  // Phase 5: AI Engine (Gemini)
+  async aiBrain(input: string, intent: string, sessionId: string, pageSource?: string): Promise<string> {
     try {
       // Check for explicit wiki command /wiki
       if (input.startsWith('/wiki ')) {
@@ -924,6 +953,10 @@ Provide a highly detailed response outlining exact code files, libraries, and in
       } else if (intent === 'debug') {
         systemPrompt = `You are a senior debugging engineer.
 Provide a step-by-step diagnostic and fixing response to resolve the reported error or issue. List exact steps clearly.`;
+      } else if (intent === 'reasoning') {
+        systemPrompt = `You are an AI with deep reasoning capabilities. Give a highly logical, step-by-step reasoning breakdown to answer the user's question.`;
+      } else if (intent === 'learning') {
+        systemPrompt = `You are a patient and knowledgeable tutor. Explain the concept or process clearly with simple analogies and examples.`;
       } else if (intent === 'knowledge') {
         systemPrompt = `You are a knowledgeable system assistant.
 Provide a clean, structured informational overview or query match from the system architecture or wiki.`;
@@ -953,35 +986,74 @@ Provide a clean, structured informational overview or query match from the syste
 
       return response.text || 'I am sorry, I could not generate a response at this time.';
     } catch (e) {
-      return this.fallbackResponse(input);
+      return this.fallback(input);
     }
   }
 
-  // Phase 1: Core Brain Controller & Performance Cache Wrapper
-  async process(input: string, sessionId: string, pageSource?: string): Promise<{ content: string, intent: 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge', isLocal: boolean }> {
+  // Phase 8: Response Controller
+  formatResponse(text: string, intent: string): string {
+    if (intent === 'chat') {
+      if (text.length > 250) {
+        return text.substring(0, 250) + "...";
+      }
+    }
+    return text;
+  }
+
+  // Phase 9: Full Brain Execution Flow (with Cache & Debounce)
+  async process(input: string, sessionId: string, pageSource?: string): Promise<{ content: string, intent: 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge' | 'reasoning' | 'learning', isLocal: boolean }> {
+    if (this.isBusy) {
+      return { content: "⚠️ System is busy, please wait.", intent: "chat", isLocal: true };
+    }
+    this.isBusy = true;
+
     const textKey = input.toLowerCase().trim();
     if (brainCache.has(textKey)) {
       console.log(`[Cache Hit] Serving response for: "${textKey}"`);
+      this.isBusy = false;
       return brainCache.get(textKey)!;
     }
 
     try {
+      // Layer 1: Input Analyzer
+      const analyzed = this.analyzeInput(input);
+
+      // Layer 2: Intent Engine
       const intent = this.detectIntent(input);
 
-      if (this.shouldUseLocal(intent, input)) {
-        const response = this.localResponse(input, intent);
-        const result = { content: response, intent, isLocal: true };
-        brainCache.set(textKey, result);
-        return result;
+      // Layer 3: Brain Router
+      const route = this.route(input, intent);
+
+      let response = "";
+      let isLocal = false;
+
+      // Layer 4 & 5 Routing
+      if (route === "LOCAL") {
+        response = this.localBrain(input, intent);
+        isLocal = true;
+      } else {
+        response = await this.aiBrain(input, intent, sessionId, pageSource);
+        isLocal = false;
       }
 
-      const response = await this.aiResponse(input, intent, sessionId, pageSource);
-      const result = { content: response, intent, isLocal: false };
+      // Layer 7: Memory System
+      this.addMemory({ role: 'user', content: input });
+      this.addMemory({ role: 'model', content: response });
+
+      // Layer 6: Response Controller
+      const formattedResponse = this.formatResponse(response, intent);
+
+      const result = { content: formattedResponse, intent, isLocal };
+
+      // Phase 11: Cache System
       brainCache.set(textKey, result);
+
+      this.isBusy = false;
       return result;
     } catch (e) {
+      this.isBusy = false;
       return { 
-        content: this.fallbackResponse(input), 
+        content: this.fallback(input), 
         intent: "chat", 
         isLocal: true 
       };

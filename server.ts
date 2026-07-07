@@ -787,6 +787,9 @@ app.get('/api/chats', async (req, res) => {
 });
 
 // MAMTA AI V7.4 — BRAIN SYSTEM MASTER PLAN
+// MAMTA AI V7.5 — BRAIN SYSTEM WITH CACHING & DYNAMIC ROUTING
+const brainCache = new Map<string, { content: string; intent: 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge'; isLocal: boolean }>();
+
 class MamtaBrain {
   private memory: any[] = [];
 
@@ -802,36 +805,36 @@ class MamtaBrain {
     }
   }
 
-  // Phase 2: Intent Detection
+  // Phase 2: Intent Detection Engine
   detectIntent(input: string): 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge' {
     const text = input.toLowerCase().trim();
 
-    if (text.startsWith("/build") || text.includes("code") || text.includes("build app") || text.startsWith("/run")) {
-      return "developer";
-    }
-    if (text.includes("fix") || text.includes("error") || text.includes("debug") || text.includes("issue")) {
-      return "debug";
-    }
-    if (text.startsWith("/plan") || text.includes("plan") || text.includes("architecture") || text.includes("blueprint") || text.includes("roadmap")) {
+    if (text.includes("plan") || text.startsWith("/plan") || text.includes("architecture") || text.includes("blueprint") || text.includes("roadmap")) {
       return "planning";
     }
-    if (text.startsWith("/wiki")) {
+    if (text.includes("build") || text.startsWith("/build") || text.includes("code") || text.startsWith("/run") || text === "build app" || text === "run app") {
+      return "developer";
+    }
+    if (text.includes("error") || text.includes("fix") || text.includes("debug") || text.includes("issue")) {
+      return "debug";
+    }
+    if (text.includes("what") || text.startsWith("/wiki")) {
       return "knowledge";
     }
 
     return "chat";
   }
 
-  // Phase 6: Smart Decision Engine
-  isLocal(intent: string, input: string): boolean {
+  // Phase 2: Smart Routing Engine
+  shouldUseLocal(intent: string, input: string): boolean {
     const text = input.toLowerCase().trim();
-    if (intent === "chat" && input.length < 20) return true;
+    if (intent === "chat" && input.length < 25) return true;
     if (text.startsWith("/help")) return true;
     if (text.startsWith("/build") || text.startsWith("/run") || text === "build app" || text === "run app") return true;
     return false;
   }
 
-  // Phase 3: Local Brain
+  // Phase 2: Human-Like Local Responses
   localResponse(input: string, intent: string): string {
     const text = input.toLowerCase().trim();
 
@@ -844,20 +847,20 @@ class MamtaBrain {
       return "💡 **MAMTA AI Help Guide**:\n- Use `/plan [idea]` to generate a master design plan.\n- Use `/wiki [query]` to search our system documentation.\n- Ask simple questions for conversational chat!\n- Commands `/build` and `/run` are restricted to the Workspace tab.";
     }
 
+    if (text.includes("hi") || text === "hello" || text === "hey" || text === "namaste") {
+      return "Hi 👋 What are you building today?";
+    }
+
     if (intent === "chat") {
       return this.chatMode(input);
     }
 
-    return "Got it 👍 Tell me more.";
+    return "Interesting 🤔 Tell me more.";
   }
 
-  // Phase 3: 🔥 Chat Mode (Most Important)
+  // Chat Mode Fallback
   chatMode(input: string): string {
     const text = input.toLowerCase().trim();
-
-    if (text.includes("hi") || text === "hello" || text === "hey" || text === "namaste") {
-      return "Hi 👋 How can I help you today?";
-    }
 
     if (text.includes("how are you")) {
       return "I'm doing great 😊 What about you?";
@@ -871,12 +874,12 @@ class MamtaBrain {
       return "Goodbye! Have an amazing day ahead! 😊";
     }
 
-    return "Got it 👍 Tell me more.";
+    return "Interesting 🤔 Tell me more.";
   }
 
-  // Phase 5: Fallback System
+  // Phase 3: AI Fallback System
   fallbackResponse(input: string): string {
-    return "⚠️ AI service is busy right now.\nBut I'm still here to help 👍";
+    return "⚠️ AI is busy, but I'm still here.";
   }
 
   // Phase 4: AI Engine (Smart Call)
@@ -900,11 +903,11 @@ class MamtaBrain {
       const client = getGeminiClient();
       firestoreLogs.incrementAiCalls();
 
-      // Phase 8: Response Style Control
+      // Response Style Control
       let systemPrompt = '';
       if (intent === 'chat') {
         systemPrompt = `You are a friendly, human-like bilingually trained assistant.
-GLOBAL RULES (Phase 10):
+GLOBAL RULES:
 1. Keep your response extremely short, concise, and natural (strictly under 2-3 lines).
 2. NEVER over-explain, NEVER list features, and NEVER describe your system architecture or available modes.
 3. Keep the tone natural, warm, and conversational (English/Hindi blended naturally, e.g., "zaroor", "namaste", "bilkul").
@@ -928,7 +931,7 @@ Provide a clean, structured informational overview or query match from the syste
         systemPrompt = `You are MAMTA AI, an autonomous full-stack AI development assistant. Speak naturally in bilingual English/Hindi.`;
       }
 
-      // Retrieve conversation history (Phase 8: Store last 10 messages in memory context)
+      // Retrieve conversation history (Store last 10 messages in memory context)
       const history = (await firestoreChats.getChats(sessionId)).slice(-10);
       const contents = history.map(msg => ({
         role: msg.role === 'model' ? 'model' : 'user',
@@ -954,21 +957,31 @@ Provide a clean, structured informational overview or query match from the syste
     }
   }
 
-  // Phase 1: Core Brain Controller & Phase 9: Fail Safe System
+  // Phase 1: Core Brain Controller & Performance Cache Wrapper
   async process(input: string, sessionId: string, pageSource?: string): Promise<{ content: string, intent: 'chat' | 'planning' | 'developer' | 'debug' | 'knowledge', isLocal: boolean }> {
+    const textKey = input.toLowerCase().trim();
+    if (brainCache.has(textKey)) {
+      console.log(`[Cache Hit] Serving response for: "${textKey}"`);
+      return brainCache.get(textKey)!;
+    }
+
     try {
       const intent = this.detectIntent(input);
 
-      if (this.isLocal(intent, input)) {
+      if (this.shouldUseLocal(intent, input)) {
         const response = this.localResponse(input, intent);
-        return { content: response, intent, isLocal: true };
+        const result = { content: response, intent, isLocal: true };
+        brainCache.set(textKey, result);
+        return result;
       }
 
       const response = await this.aiResponse(input, intent, sessionId, pageSource);
-      return { content: response, intent, isLocal: false };
+      const result = { content: response, intent, isLocal: false };
+      brainCache.set(textKey, result);
+      return result;
     } catch (e) {
       return { 
-        content: "⚠️ Something went wrong, try again.", 
+        content: this.fallbackResponse(input), 
         intent: "chat", 
         isLocal: true 
       };

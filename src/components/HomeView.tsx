@@ -14,7 +14,7 @@ import {
 import { ChatMessage } from '../types';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-import { MamtaBrain } from '../brain/MamtaBrain';
+import { MamtaBrainV10 } from '../brain/MamtaBrainV10';
 import { AutonomousLoop } from '../brain/AutonomousLoop';
 
 interface HomeViewProps {
@@ -96,7 +96,7 @@ const StreamingResponse: React.FC<{ text: string; onComplete?: () => void }> = (
 };
 
 export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: HomeViewProps) {
-  const [brain] = useState(() => new MamtaBrain());
+  const [brain] = useState(() => new MamtaBrainV10());
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);

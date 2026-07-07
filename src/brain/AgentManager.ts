@@ -37,7 +37,7 @@ export class AgentManager {
 - **Core Snippet suggested:**
 \`\`\`typescript
 // High performance reactive state management
-const [brain, setBrain] = useState(() => new MamtaBrain());
+const [brain, setBrain] = useState(() => new MamtaBrainV10());
 const response = await brain.process(input, sessionId);
 \`\`\`
 - **Optimization Strategy:** Keep imports static and lightweight. Cache repetitive patterns in-memory (L1) and Firestore database (L2).`;

@@ -1,19 +1,21 @@
 import { MindsetEngine } from "./MindsetEngine";
 import { DecisionEngine } from "./DecisionEngine";
-import { LearningEngine } from "./LearningEngine";
 import { AgentManager } from "./AgentManager";
+import { LearningEngine } from "./LearningEngine";
 import { ThinkingEngine } from "./ThinkingEngine";
 import { PlannerEngine } from "./PlannerEngine";
 import { ExecutorEngine } from "./ExecutorEngine";
 import { VerificationEngine } from "./VerificationEngine";
 
-export class MamtaBrain {
+export { ThinkingEngine, PlannerEngine, ExecutorEngine, VerificationEngine };
+
+export class MamtaBrainV10 {
   private mindset: MindsetEngine;
   private decision: DecisionEngine;
-  private learning: LearningEngine;
   private agents: AgentManager;
-
-  // V10 Autonomous Engines
+  private learning: LearningEngine;
+  
+  // V10 Core Action Engines
   private thinker: ThinkingEngine;
   private planner: PlannerEngine;
   private executor: ExecutorEngine;
@@ -37,18 +39,14 @@ export class MamtaBrain {
   constructor() {
     this.mindset = new MindsetEngine();
     this.decision = new DecisionEngine();
-    this.learning = new LearningEngine();
     this.agents = new AgentManager();
+    this.learning = new LearningEngine();
 
-    // V10 Init
+    // V10 Core Engines instantiation
     this.thinker = new ThinkingEngine();
     this.planner = new PlannerEngine();
     this.executor = new ExecutorEngine();
     this.verifier = new VerificationEngine();
-
-    this.memory = [];
-    this.cache = new Map();
-    this.isBusy = false;
 
     this.initBrain();
   }
@@ -80,9 +78,9 @@ export class MamtaBrain {
     try {
       await this.learning.init();
       this.knowledge = await this.learning.loadKnowledge();
-      console.log("🔥 Mamta AI V10 Initialized with Knowledge map of size:", Object.keys(this.knowledge).length);
+      console.log("🔥 Mamta AI V10 Core Engine Initialized with Knowledge map of size:", Object.keys(this.knowledge).length);
     } catch (err) {
-      console.warn("Failed initializing learning engine, fallback active:", err);
+      console.warn("Failed initializing learning engine in V10, fallback active:", err);
     }
     this.startSelfTrainingLoop();
   }
@@ -90,7 +88,7 @@ export class MamtaBrain {
   private startSelfTrainingLoop() {
     if (typeof window !== "undefined" && !this.trainingInterval) {
       this.trainingInterval = setInterval(() => {
-        console.log("⚡ Mamta AI V10 Self-Training Loop Active. Tuning autonomous state parameters...");
+        console.log("⚡ Mamta AI V10 Autonomous State Tuning loop active...");
         this.optimizeBrainPatterns();
       }, 30000);
     }
@@ -112,7 +110,7 @@ export class MamtaBrain {
       }
       const mostActive = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
       if (mostActive && mostActive[1] > 1) {
-        console.log(`[Self-Optimization] V10 promoting high-demand vector pattern to priority cache: "${mostActive[0]}"`);
+        console.log(`[Self-Optimization V10] Promoting high-demand query pattern to active priority list: "${mostActive[0]}"`);
       }
     }
   }
@@ -134,18 +132,18 @@ export class MamtaBrain {
     const text = input.toLowerCase().trim();
 
     if (text === "hi" || text === "hello" || text === "hey" || text === "namaste") {
-      return `[Mindset: ${mindset}] Hello and Namaste! Mamta AI V10 Autonomous Active Mode is fully online. Aapka system optimize ho gaya hai. Main aapki kya sahayata kar sakti hoon? 😊`;
+      return `[Mindset: ${mindset}] Hello and Namaste! Mamta AI V10 Core Autonomous Pipeline is fully active. Aapka system status perfectly optimized hai. Main aapki kya sahayata kar sakti hoon? 😊`;
     }
 
     if (text.includes("how are you")) {
-      return `[Mindset: ${mindset}] Main V10 Dynamic Loop aur Thinking Engines ke sath perfect feel kar rahi hoon! All sub-agents stable hain. Aap kaise hain? 😊`;
+      return `[Mindset: ${mindset}] V10 autonomous pipeline (Thinking, Planner, Executor, Verification) is running at peak speed. Sabhi core engines 100% active hain! How are you doing? 😊`;
     }
 
     if (text.includes("thank")) {
-      return `[Mindset: ${mindset}] Acknowledged! Happy to help! Main hamesha autonomous actions perform kar rahi hoon. 🙌`;
+      return `[Mindset: ${mindset}] My pleasure! The V10 neural pipeline is always running autonomously behind the scenes. 🙌`;
     }
 
-    return `[Mindset: ${mindset}] Local context check: Task "${input}" completed inside offline sandbox instantly.`;
+    return `[Mindset: ${mindset}] Offline simulation complete: Processed "${input}" within offline local sandbox perfectly.`;
   }
 
   async aiBrain(input: string, sessionId: string, intent: string): Promise<string> {
@@ -170,8 +168,7 @@ export class MamtaBrain {
 
   // Autonomous goal action flow for loop execution
   public async autoThink(): Promise<string> {
-    // Background health checking, pattern optimization or routine cleanup
-    return this.process("optimize system", "background-loop-id-" + Date.now().toString().slice(-4));
+    return this.process("optimize system safety constraints", "background-loop-id-" + Date.now().toString().slice(-4));
   }
 
   evolve(response: string, intent: string): string {
@@ -217,7 +214,7 @@ export class MamtaBrain {
       console.log(`[Self-Learning L2 Hit] Mamta AI V10 Serving knowledge key: "${input}"`);
       response = learnedResponse;
     } else {
-      // 3. V10 Thinking and Goal Action Engine Execution
+      // 3. V10 Thinking, Planning, Executing, and Verification Loop Execution
       this.notifyPipeline({
         step: 'thinking',
         details: `Analyzing target vector input: "${input}"...`,

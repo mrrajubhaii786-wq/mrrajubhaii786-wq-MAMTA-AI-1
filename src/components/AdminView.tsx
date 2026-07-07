@@ -23,7 +23,7 @@ import {
   Zap
 } from 'lucide-react';
 import { SystemMetrics, ActivityLog, WikiEntry } from '../types';
-import { MamtaBrain } from '../brain/MamtaBrain';
+import { MamtaBrainV10 } from '../brain/MamtaBrainV10';
 import { AutonomousLoop } from '../brain/AutonomousLoop';
 import { db } from '../lib/firebase';
 
@@ -39,7 +39,7 @@ export default function AdminView({ sessionId }: AdminViewProps) {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   
   // V10 Autonomous Monitoring States
-  const [brain] = useState(() => new MamtaBrain());
+  const [brain] = useState(() => new MamtaBrainV10());
   const [autoLoop] = useState(() => new AutonomousLoop(brain));
   const [isAutoActive, setIsAutoActive] = useState(false);
   const [autoStatus, setAutoStatus] = useState("Autonomous Standby");
@@ -49,6 +49,19 @@ export default function AdminView({ sessionId }: AdminViewProps) {
   ]);
   const [learnedKnowledge, setLearnedKnowledge] = useState<{ id: string; input: string; response: string; timestamp: number }[]>([]);
   const [isDeletingNode, setIsDeletingNode] = useState<string | null>(null);
+  const [pipelineState, setPipelineState] = useState<{
+    step: 'idle' | 'thinking' | 'planning' | 'executing' | 'verifying';
+    details?: string;
+    goal?: string;
+    plan?: { task: string; status: 'pending' | 'running' | 'completed' | 'failed' }[];
+    currentTaskIndex?: number;
+  }>({
+    step: 'idle',
+    details: 'Autonomous worker standby. Ready for instructions.',
+    goal: 'None',
+    plan: [],
+    currentTaskIndex: 0
+  });
 
   // Wiki list and CRUD
   const [wikiEntries, setWikiEntries] = useState<WikiEntry[]>([]);
@@ -75,6 +88,25 @@ export default function AdminView({ sessionId }: AdminViewProps) {
 
     autoLoop.subscribe(handleStatusUpdate);
 
+    // Subscribe to V10 Real-Time pipeline telemetry events
+    const unsubscribePipeline = brain.subscribeToPipeline((event) => {
+      setPipelineState(event);
+      if (event.details) {
+        const stepEmojis: Record<string, string> = {
+          thinking: '🧠 [Thinking]',
+          planning: '📋 [Planning]',
+          executing: '⚙️ [Executing]',
+          verifying: '🛡️ [Verifying]',
+          idle: '💤 [Standby]'
+        };
+        const prefix = stepEmojis[event.step] || '⚙️';
+        setTerminalLogs(prev => [
+          `[${new Date().toLocaleTimeString()}] ${prefix} ${event.details}`,
+          ...prev.slice(0, 49)
+        ]);
+      }
+    });
+
     // Polling diagnostics every 10 seconds for real-time feel
     const interval = setInterval(() => {
       fetchMetrics();
@@ -86,6 +118,7 @@ export default function AdminView({ sessionId }: AdminViewProps) {
       clearInterval(interval);
       autoLoop.unsubscribe(handleStatusUpdate);
       autoLoop.stop();
+      unsubscribePipeline();
       brain.destroy();
     };
   }, [autoLoop]);
@@ -648,6 +681,127 @@ export default function AdminView({ sessionId }: AdminViewProps) {
                   <Zap className="w-3 h-3 text-emerald-400" />
                 </button>
               </div>
+            </div>
+
+            {/* Real-time V10 Pipeline Dashboard */}
+            <div id="v10_pipeline_dashboard" className="bg-slate-950/40 border border-slate-800 rounded-xl p-3.5 mb-3 shadow-md">
+              <div className="flex items-center justify-between mb-3 border-b border-slate-850 pb-2">
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                  Real-time V10 Pipeline Status
+                </span>
+                <span className="text-[9px] font-mono text-slate-500">
+                  Current Goal: <strong className="text-slate-300">{pipelineState.goal || "None"}</strong>
+                </span>
+              </div>
+
+              {/* Stepper Grid */}
+              <div className="grid grid-cols-4 gap-2 text-center">
+                
+                {/* Step 1: Thinking */}
+                <div className={`p-2 rounded-lg border transition-all duration-300 ${
+                  pipelineState.step === 'thinking'
+                    ? 'bg-indigo-500/15 border-indigo-500/40 shadow-[0_0_12px_rgba(99,102,241,0.2)]'
+                    : 'bg-slate-900/30 border-slate-850 opacity-60'
+                }`}>
+                  <div className="flex justify-center mb-1">
+                    <Brain className={`w-5 h-5 ${pipelineState.step === 'thinking' ? 'text-indigo-400 animate-pulse' : 'text-slate-500'}`} />
+                  </div>
+                  <p className="text-[10px] font-bold font-mono text-slate-300 uppercase">1. Think</p>
+                  <p className="text-[8px] text-slate-500 font-mono mt-0.5">
+                    {pipelineState.step === 'thinking' ? 'ACTIVE' : 'STANDBY'}
+                  </p>
+                </div>
+
+                {/* Step 2: Planning */}
+                <div className={`p-2 rounded-lg border transition-all duration-300 ${
+                  pipelineState.step === 'planning'
+                    ? 'bg-emerald-500/15 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+                    : 'bg-slate-900/30 border-slate-850 opacity-60'
+                }`}>
+                  <div className="flex justify-center mb-1">
+                    <Activity className={`w-5 h-5 ${pipelineState.step === 'planning' ? 'text-emerald-400 animate-spin' : 'text-slate-500'}`} style={{ animationDuration: '4s' }} />
+                  </div>
+                  <p className="text-[10px] font-bold font-mono text-slate-300 uppercase">2. Plan</p>
+                  <p className="text-[8px] text-slate-500 font-mono mt-0.5">
+                    {pipelineState.step === 'planning' ? 'ACTIVE' : 'STANDBY'}
+                  </p>
+                </div>
+
+                {/* Step 3: Executing */}
+                <div className={`p-2 rounded-lg border transition-all duration-300 ${
+                  pipelineState.step === 'executing'
+                    ? 'bg-amber-500/15 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
+                    : 'bg-slate-900/30 border-slate-850 opacity-60'
+                }`}>
+                  <div className="flex justify-center mb-1">
+                    <Cpu className={`w-5 h-5 ${pipelineState.step === 'executing' ? 'text-amber-400 animate-pulse' : 'text-slate-500'}`} />
+                  </div>
+                  <p className="text-[10px] font-bold font-mono text-slate-300 uppercase">3. Execute</p>
+                  <p className="text-[8px] text-slate-500 font-mono mt-0.5">
+                    {pipelineState.step === 'executing' ? 'ACTIVE' : 'STANDBY'}
+                  </p>
+                </div>
+
+                {/* Step 4: Verifying */}
+                <div className={`p-2 rounded-lg border transition-all duration-300 ${
+                  pipelineState.step === 'verifying'
+                    ? 'bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
+                    : 'bg-slate-900/30 border-slate-850 opacity-60'
+                }`}>
+                  <div className="flex justify-center mb-1">
+                    <CheckCircle className={`w-5 h-5 ${pipelineState.step === 'verifying' ? 'text-cyan-400 animate-bounce' : 'text-slate-500'}`} />
+                  </div>
+                  <p className="text-[10px] font-bold font-mono text-slate-300 uppercase">4. Verify</p>
+                  <p className="text-[8px] text-slate-500 font-mono mt-0.5">
+                    {pipelineState.step === 'verifying' ? 'ACTIVE' : 'STANDBY'}
+                  </p>
+                </div>
+
+              </div>
+
+              {/* Status details bar */}
+              <div className="bg-slate-950 border border-slate-850 rounded-lg p-2.5 mt-3.5 text-xs font-mono">
+                <div className="flex justify-between text-slate-500 text-[10px] mb-1">
+                  <span>Current Process Vector</span>
+                  <span className="text-slate-300 font-semibold uppercase">{pipelineState.step}</span>
+                </div>
+                <p className="text-[11px] text-slate-200 leading-snug">{pipelineState.details || "Standby. Ready for next query trigger."}</p>
+              </div>
+
+              {/* Dynamic Subtask Progress Tree */}
+              {pipelineState.plan && pipelineState.plan.length > 0 && (
+                <div className="mt-3.5 pt-3 border-t border-slate-850/60 space-y-2">
+                  <p className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-wider mb-2">Formulated Action Sequence Tasks</p>
+                  <div className="space-y-1">
+                    {pipelineState.plan.map((task, idx) => (
+                      <div key={idx} className={`flex items-center justify-between text-[11px] font-mono px-2 py-1 rounded border transition-colors ${
+                        idx === pipelineState.currentTaskIndex && pipelineState.step === 'executing'
+                          ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
+                          : task.status === 'completed'
+                          ? 'bg-emerald-950/20 border-emerald-900/30 text-emerald-400'
+                          : task.status === 'failed'
+                          ? 'bg-rose-950/20 border-rose-900/30 text-rose-400'
+                          : 'bg-slate-900/20 border-slate-850/40 text-slate-500'
+                      }`}>
+                        <div className="flex items-center gap-2 truncate">
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            idx === pipelineState.currentTaskIndex && pipelineState.step === 'executing'
+                              ? 'bg-indigo-400 animate-ping'
+                              : task.status === 'completed'
+                              ? 'bg-emerald-400'
+                              : task.status === 'failed'
+                              ? 'bg-rose-500'
+                              : 'bg-slate-700'
+                          }`} />
+                          <span className="truncate">{task.task}</span>
+                        </div>
+                        <span className="text-[9px] font-bold uppercase shrink-0 px-1">{task.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Terminal View */}

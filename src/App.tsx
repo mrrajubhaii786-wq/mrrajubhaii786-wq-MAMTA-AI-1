@@ -10,7 +10,8 @@ import {
   Bot,
   Terminal,
   Clock,
-  Sparkles
+  Sparkles,
+  Rocket
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -19,10 +20,11 @@ import HomeView from './components/HomeView';
 import WorkspaceView from './components/WorkspaceView';
 import AdminView from './components/AdminView';
 import SafeDropView from './components/SafeDropView';
+import LaunchHubView from './components/LaunchHubView';
 import ErrorBoundary from './components/ErrorBoundary';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'home' | 'workspace' | 'admin' | 'safedrop'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'workspace' | 'admin' | 'safedrop' | 'launch'>('home');
   const [sessionId, setSessionId] = useState('');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -101,6 +103,19 @@ export default function App() {
           >
             <Briefcase className="w-3.5 h-3.5 shrink-0" />
             <span>Workspace IDE</span>
+          </button>
+
+          <button
+            id="nav_link_launch"
+            onClick={() => { setActiveTab('launch'); setMobileMenuOpen(false); }}
+            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+              activeTab === 'launch' 
+                ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-400 border border-emerald-500/15 shadow-inner' 
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+            }`}
+          >
+            <Rocket className="w-3.5 h-3.5 shrink-0" />
+            <span>SaaS Launch Hub</span>
           </button>
 
           <button
@@ -200,6 +215,16 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => { setActiveTab('launch'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'launch' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Rocket className="w-4 h-4" />
+                <span>SaaS Launch Hub</span>
+              </button>
+
+              <button
                 onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
                   activeTab === 'admin' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15' : 'text-slate-400'
@@ -255,6 +280,9 @@ export default function App() {
               )}
               {activeTab === 'safedrop' && (
                 <SafeDropView sessionId={sessionId} />
+              )}
+              {activeTab === 'launch' && (
+                <LaunchHubView sessionId={sessionId} />
               )}
             </motion.div>
           </AnimatePresence>

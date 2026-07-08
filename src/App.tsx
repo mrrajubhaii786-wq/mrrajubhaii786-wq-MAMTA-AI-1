@@ -68,7 +68,7 @@ export default function App() {
           <div>
             <h1 className="text-xs font-bold tracking-tight text-slate-100 font-display flex items-center gap-1 uppercase">
               MAMTA AI
-              <span className="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1 rounded-md lowercase normal-case tracking-normal">v7.0</span>
+              <span className="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1 rounded-md lowercase normal-case tracking-normal">v16.0 SaaS</span>
             </h1>
             <p className="text-[9px] text-slate-500 font-mono tracking-wider font-semibold">AUTONOMOUS CORE</p>
           </div>

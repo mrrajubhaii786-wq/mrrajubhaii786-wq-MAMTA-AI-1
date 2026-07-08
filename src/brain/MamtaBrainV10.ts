@@ -222,7 +222,7 @@ export class MamtaBrainV10 {
     };
   }
 
-  private notifyPipeline(event: {
+  public notifyPipeline(event: {
     step: 'idle' | 'thinking' | 'planning' | 'executing' | 'verifying';
     details?: string;
     goal?: string;

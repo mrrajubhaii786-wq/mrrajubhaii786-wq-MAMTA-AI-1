@@ -48,6 +48,8 @@ import { validate, chatValidation, planValidation, vaultValidation, wikiValidati
 import { apiLimiter, chatLimiter, planLimiter, adminLimiter } from './src/middleware/rateLimit';
 import helmet from 'helmet';
 import { getRealSystemMetrics } from './src/services/systemMetrics';
+import { createPaymentOrder } from './src/services/PaymentService';
+import { getOrCreateUser, getDashboard, handleUpgradeUser } from './src/services/SubscriptionService';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -1583,6 +1585,50 @@ app.delete('/api/admin/wiki/:id', async (req, res) => {
       details: `Deleted wiki entry ID: ${id}`
     });
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// REAL WORLD MODE: Subscription & Payment SaaS Gateways
+app.post('/api/payments/create-order', async (req, res) => {
+  const { amount, sessionId } = req.body;
+  if (!amount) return res.status(400).json({ error: 'Order amount is required' });
+
+  try {
+    const order = await createPaymentOrder(Number(amount));
+    res.json(order);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/payments/upgrade', async (req, res) => {
+  const { sessionId, planKey, amount } = req.body;
+  if (!sessionId || !planKey) {
+    return res.status(400).json({ error: 'sessionId and target planKey are required' });
+  }
+
+  try {
+    const updatedUser = handleUpgradeUser(sessionId, planKey, Number(amount || 0));
+    res.json({
+      success: true,
+      message: `Successfully upgraded to ${planKey}!`,
+      user: updatedUser
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/payments/dashboard', (req, res) => {
+  const { sessionId } = req.query;
+  if (!sessionId) return res.status(400).json({ error: 'sessionId query parameter is required' });
+
+  try {
+    const user = getOrCreateUser(String(sessionId));
+    const dashboardStats = getDashboard(user);
+    res.json(dashboardStats);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

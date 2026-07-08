@@ -56,6 +56,10 @@ export class LearningEngine {
     await this.learn(input, response, intent);
   }
 
+  async saveMemory(input: string, response: string): Promise<void> {
+    await this.learn(input, response, "CHAT");
+  }
+
   async learn(input: string, response: string, intent = "CHAT"): Promise<void> {
     const key = input.toLowerCase().trim();
     

@@ -3,6 +3,19 @@ import { DecisionEngine } from "./DecisionEngine";
 import { AgentManager } from "./AgentManager";
 import { LearningEngine } from "./LearningEngine";
 import { localReasoning } from "./MamtaBrainLocal";
+import { ConversationMemory } from "./ConversationMemory";
+import { ContextEngine } from "./ContextEngine";
+import { PersonalityEngine } from "./PersonalityEngine";
+import { EmotionEngine } from "./EmotionEngine";
+import { ResponseGeneratorV2 } from "./ResponseGeneratorV2";
+import { SelfTrainer } from "./SelfTrainer";
+import { AutonomousBrainV1 } from "./AutonomousBrainV1";
+import { LocalLLM } from "./LocalLLM";
+import { ToolEngine } from "./ToolEngine";
+import { BrainRouterV2 } from "./BrainRouterV2";
+import { RAGEngine } from "./RAGEngine";
+import { ToolAutomation } from "./ToolAutomation";
+import { SelfLearning } from "./SelfLearning";
 
 export interface Thought {
   goal: string;
@@ -141,6 +154,25 @@ export class MamtaBrainV10 {
   private decision: DecisionEngine;
   private agents: AgentManager;
   private learning: LearningEngine;
+  public autonomousBrainV1: AutonomousBrainV1;
+
+  // Level 6 AGI Engines
+  public llm = new LocalLLM();
+  public tools = new ToolEngine();
+  public router = new BrainRouterV2();
+
+  // Level 7 RAG + Vector AI Engines
+  public rag = new RAGEngine();
+  public toolAutomation = new ToolAutomation();
+  public selfLearning = new SelfLearning();
+
+  // Level 4 Human Like AI Engines
+  public conversationMemory = new ConversationMemory();
+  private contextEngine = new ContextEngine();
+  private emotionEngine = new EmotionEngine();
+  private responder = new ResponseGeneratorV2();
+  private trainer = new SelfTrainer();
+  private personality = new PersonalityEngine();
   
   // V10 Core Action Engines
   private thinker: ThinkingEngine;
@@ -168,6 +200,7 @@ export class MamtaBrainV10 {
     this.decision = new DecisionEngine();
     this.agents = new AgentManager();
     this.learning = new LearningEngine();
+    this.autonomousBrainV1 = new AutonomousBrainV1();
 
     // V10 Core Engines instantiation
     this.thinker = new ThinkingEngine();
@@ -292,11 +325,11 @@ export class MamtaBrainV10 {
       if (reply && !reply.includes("temporarily unreachable") && !reply.includes("unreachable")) {
         return reply;
       }
-      console.log("⚠️ AI FAILED OR UNREACHABLE → LOCAL REASONING BRAIN");
-      return localReasoning(input);
+      console.log("⚠️ AI FAILED OR UNREACHABLE → LEVEL 3 CHAT BRAIN");
+      return this.chatBrain(input, intent);
     } catch (e) {
-      console.log("⚠️ AI FAILED → LOCAL REASONING BRAIN", e);
-      return localReasoning(input);
+      console.log("⚠️ AI FAILED → LEVEL 3 CHAT BRAIN", e);
+      return this.chatBrain(input, intent);
     }
   }
 
@@ -318,16 +351,38 @@ export class MamtaBrainV10 {
   private chatBrain(input: string, mindset: string): string {
     this.notifyPipeline({
       step: 'thinking',
-      details: `Processing local response instantly...`,
-      goal: 'Local Chat Response'
+      details: 'Generating human-like natural conversation...',
+      goal: 'Level 4 Conversation Engine'
     });
-    const res = this.localBrain(input, mindset);
+
+    // STEP 1: SAVE USER MESSAGE
+    this.conversationMemory.add("user", input);
+
+    // STEP 2: DETECT EMOTION
+    const emotion = this.emotionEngine.detectEmotion(input);
+
+    // STEP 3: CONTEXT ANALYSIS
+    const context = this.contextEngine.analyze(
+      input,
+      this.conversationMemory.getFull()
+    );
+
+    // STEP 4: GENERATE RESPONSE
+    let output = this.responder.generate(input, context, emotion);
+
+    // STEP 5: SELF IMPROVEMENT ENGINE
+    output = this.trainer.improve(output);
+
+    // STEP 6: SAVE AI RESPONSE
+    this.conversationMemory.add("ai", output);
+
     this.notifyPipeline({
       step: 'idle',
-      details: `Local response returned.`,
-      goal: 'Local Chat Response'
+      details: 'Natural response generated successfully.',
+      goal: 'Level 4 Conversation Engine'
     });
-    return res;
+
+    return output;
   }
 
   private async reasoningBrain(input: string, sessionId: string, intent: string): Promise<string> {
@@ -413,20 +468,89 @@ export class MamtaBrainV10 {
       return memoryResponse;
     }
 
-    // 3. Multi Mindset System Routing (Dynamic Routing)
-    if (decision.mode === "AGENT") {
-      response = await this.agentBrain(input, intent);
-    } else if (decision.mode === "PLAN") {
-      response = this.plannerBrain(input);
-    } else if (decision.mode === "AI") {
-      response = await this.reasoningBrain(input, sessionId, intent);
+    // Level 7: Retrieve semantic context from Vector RAG Engine
+    const ragContext = await this.rag.retrieveContext(input);
+    if (ragContext) {
+      console.log(`🔍 [Level 7 Vector RAG Hit] Retrieved context: "${ragContext}"`);
+    }
+
+    // Level 7: Tool Automation Runner check
+    const toolOutput = await this.toolAutomation.run(input);
+
+    if (toolOutput) {
+      this.notifyPipeline({
+        step: 'executing',
+        details: 'Executing Level 7 autonomous tool automation...',
+        goal: 'RAG + Vector AI Automation'
+      });
+      response = toolOutput;
     } else {
-      response = this.chatBrain(input, mindset);
+      // 3. Multi Mindset System Routing (Level 6 AGI & Dynamic Routing)
+      const route = this.router.route(intent, input);
+      console.log(`🧠 [Level 6 OS Router] Routing "${input}" to ${route} mode.`);
+
+      if (route === "TOOL") {
+        this.notifyPipeline({
+          step: 'executing',
+          details: 'Executing tool via autonomous action engine...',
+          goal: 'Level 6 AGI Tool Engine'
+        });
+        let command = "CODE";
+        if (input.toLowerCase().includes("file") || input.toLowerCase().includes("create")) {
+          command = "FILE";
+        } else if (input.toLowerCase().includes("web") || input.toLowerCase().includes("search") || input.toLowerCase().includes("find")) {
+          command = "WEB";
+        }
+        response = await this.tools.execute(command, input);
+      } else {
+        if (decision.mode === "AI" || intent === "REASONING") {
+          this.notifyPipeline({
+            step: 'thinking',
+            details: 'Prompting Local LLM with Vector RAG context...',
+            goal: 'Level 7 RAG + Vector LLM Brain'
+          });
+
+          let promptText = input;
+          if (ragContext) {
+            promptText = `[Level 7 Context Recall from Vector Memory]\n"${ragContext}"\n\nUser: ${input}`;
+          }
+
+          response = await this.llm.generate(`
+You are Mamta AI V12.
+Use memory/context if relevant to answer the user in a smart, human-like and helpful way.
+
+Context:
+${promptText}
+          `, sessionId);
+        } else if (decision.mode === "AGENT") {
+          response = await this.agentBrain(input, intent);
+        } else if (decision.mode === "PLAN") {
+          response = this.plannerBrain(input);
+        } else {
+          response = this.chatBrain(input, mindset);
+        }
+      }
+    }
+
+    // Level 5 Autonomous OS verification and self-evolution check
+    const autoResult = await this.autonomousBrainV1.process(input, intent);
+    this.notifyPipeline({
+      step: 'verifying',
+      details: `[Level 5 OS] ${autoResult.system}`,
+      goal: 'Self-Evolution Engine'
+    });
+
+    if (!response && autoResult.response) {
+      response = autoResult.response;
     }
 
     // 4. Record to memory Logs
     this.memory.push({ input, response, timestamp: Date.now() });
     if (this.memory.length > 50) this.memory.shift();
+
+    // Level 7: Store into Vector RAG & trigger self-learning logic
+    await this.rag.store(input, response);
+    this.selfLearning.learn(this.memory, input, response);
 
     // 5. Commit learned insight to firestore database knowledge store
     await this.learning.learn(input, response, intent);

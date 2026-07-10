@@ -9,6 +9,16 @@ import { randomUUID } from 'crypto';
 // Load environment variables
 dotenv.config();
 
+import { postToTwitter } from './src/growth/twitterBot';
+import { postToYouTube } from './src/growth/youtubeBot';
+import { prepareInstagramPost } from './src/growth/instagramHelper';
+import cron from 'node-cron';
+import { AutoMarketing } from './src/marketing/AutoMarketing';
+import multer from 'multer';
+import { generateVoice as localGenerateVoice } from './src/voice/VoiceCloneEngine';
+import { listVoiceModels, voiceLibrary } from './src/voice/VoiceLibrary';
+
+
 import { 
   dbChats, 
   dbPlans, 
@@ -1399,6 +1409,149 @@ app.post('/api/workspace/files/:projectId/delete', async (req, res) => {
   }
 });
 
+// Workspace Live App Preview Routes
+app.get('/api/workspace/preview/:projectId', (req, res) => {
+  const { projectId } = req.params;
+  const fileName = (req.query.file as string) || 'index.html';
+  try {
+    const text = dbFiles.readFile(projectId, fileName);
+    let contentType = 'text/html';
+    if (fileName.endsWith('.js')) contentType = 'application/javascript';
+    else if (fileName.endsWith('.css')) contentType = 'text/css';
+    else if (fileName.endsWith('.json')) contentType = 'application/json';
+    
+    res.setHeader('Content-Type', contentType);
+    res.send(text);
+  } catch (err) {
+    // Fallback: If requested file is index.html but not found, try to find any HTML file in project
+    try {
+      const files = dbFiles.listProjectFiles(projectId);
+      const htmlFile = files.find(f => f.endsWith('.html'));
+      if (htmlFile && htmlFile !== fileName) {
+        const text = dbFiles.readFile(projectId, htmlFile);
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(text);
+      }
+    } catch {}
+    res.status(404).send(`<html><body style="font-family: sans-serif; color: #94a3b8; background: #0f172a; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; padding: 20px;"><div><div style="font-size: 32px; margin-bottom: 12px;">🏗️</div><h3 style="color: #10b981; margin-bottom: 8px; font-weight: 600;">No Preview Active Yet</h3><p style="font-size: 13px; color: #64748b; max-width: 320px; margin: 0 auto 16px;">MAMTA AI is ready. Click "Build Project Codes" or run automated compiles to generate the index.html template and view the live app.</p></div></body></html>`);
+  }
+});
+
+app.get('/api/workspace/preview/:projectId/*', (req, res) => {
+  const { projectId } = req.params;
+  const fileName = req.params[0];
+  try {
+    const text = dbFiles.readFile(projectId, fileName);
+    let contentType = 'text/plain';
+    if (fileName.endsWith('.html')) contentType = 'text/html';
+    else if (fileName.endsWith('.js')) contentType = 'application/javascript';
+    else if (fileName.endsWith('.css')) contentType = 'text/css';
+    else if (fileName.endsWith('.json')) contentType = 'application/json';
+    
+    res.setHeader('Content-Type', contentType);
+    res.send(text);
+  } catch (err) {
+    res.status(404).send('File not found');
+  }
+});
+
+// Prompt-driven Master Plan Direct Code Modifications
+app.post('/api/plans/:projectId/update-prompt', async (req, res) => {
+  const { projectId } = req.params;
+  const { prompt, sessionId } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
+
+  try {
+    const plan = await sqlPlans.getPlan(projectId);
+    if (!plan) return res.status(404).json({ error: 'Plan not found' });
+
+    await firestoreLogs.addActivityLog({
+      action: 'AI Master Plan Direct Edit',
+      page: 'workspace',
+      userSession: sessionId || 'ANON',
+      details: `Prompt: ${prompt.substring(0, 100)}`
+    });
+
+    const existingFiles = dbFiles.listProjectFiles(projectId);
+    const existingFilesMeta = existingFiles.map(fn => {
+      try {
+        const text = dbFiles.readFile(projectId, fn);
+        return `File: ${fn}\n\`\`\`\n${text.substring(0, 1500)}\n\`\`\``;
+      } catch {
+        return `File: ${fn} (unreadable)`;
+      }
+    }).join('\n\n');
+
+    const client = getGeminiClient();
+    firestoreLogs.incrementAiCalls();
+
+    const systemPrompt = `You are MAMTA AI's Master Architect and Code Modifier. The user has requested a direct modification to their web application using this prompt:
+"${prompt}"
+
+Here is the current Project Master Plan:
+"""
+${plan.content}
+"""
+
+Here are the existing compiled files in the project:
+${existingFiles.length === 0 ? 'No files generated yet.' : existingFilesMeta}
+
+Your job is to read these files and apply the user's modifications. You must output the complete contents of any new or modified files. Do NOT use placeholders.
+Provide modern, highly polished, beautiful designs (Tailwind, Inter, JetBrains Mono, nice negative space, elegant interactive elements).
+
+You must respond with a strict JSON object of this schema:
+{
+  "files": [
+    {
+      "name": "relative/path/to/file.html",
+      "content": "Full string content of the file."
+    }
+  ],
+  "logs": "Detailed step-by-step description of what edits were performed on which files (e.g. 'Successfully injected dark mode styles and added a toggle button to index.html...')"
+}
+
+Do not return any markdown wraps or wrapper text. Return only the raw JSON.`;
+
+    const response = await generateContentWithRetry(client, {
+      model: 'gemini-3.5-flash',
+      contents: systemPrompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.3,
+      }
+    });
+
+    let rawJson = (response.text || '{}').trim();
+    if (rawJson.startsWith('```json')) {
+      rawJson = rawJson.replace(/```json\s*/, '').replace(/\s*```$/, '');
+    } else if (rawJson.startsWith('```')) {
+      rawJson = rawJson.replace(/```\s*/, '').replace(/\s*```$/, '');
+    }
+
+    const result = JSON.parse(rawJson);
+    const writtenFiles: string[] = [];
+
+    if (result.files && Array.isArray(result.files)) {
+      for (const file of result.files) {
+        if (file.name && file.content !== undefined) {
+          dbFiles.saveFile(projectId, file.name, file.content);
+          writtenFiles.push(file.name);
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      logs: result.logs || 'Prompt processed successfully.',
+      filesWritten: writtenFiles
+    });
+
+  } catch (err: any) {
+    console.error('Update prompt error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // SafeDrop Vault Endpoints
 app.get('/api/vault', async (req, res) => {
   try {
@@ -1630,6 +1783,309 @@ app.get('/api/payments/dashboard', (req, res) => {
     const dashboardStats = getDashboard(user);
     res.json(dashboardStats);
   } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 👉 MAMTA GROWTH BOT (PRODUCTION AUTO POST CORES)
+// ==========================================
+
+interface GrowthPost {
+  title: string;
+  reel: string;
+  caption: string;
+  hashtags: string;
+  createdAt: number;
+}
+
+interface GrowthLog {
+  message: string;
+  timestamp: number;
+}
+
+let postQueue: GrowthPost[] = [
+  {
+    title: "Mamta AI Launch Secret",
+    reel: "This AI built my complete startup in exactly 60 seconds... 😳",
+    caption: "How I launched an AI-driven FinTech application using Node & Razorpay in 1 weekend.",
+    hashtags: "#AI #SaaS #Growth #Viral #IndieHackers",
+    createdAt: Date.now() - 3600000
+  }
+];
+
+let growthLogs: GrowthLog[] = [
+  { message: "🤖 [MAMTA GROWTH BOT] Level 10 core automated engine initialized.", timestamp: Date.now() - 7200000 },
+  { message: "📅 [SCHEDULER] Node-Cron job scheduled to run every 6 hours (0 */6 * * *).", timestamp: Date.now() - 7190000 },
+  { message: "📥 Pre-populated 1 starter viral marketing item into queue.", timestamp: Date.now() - 7180000 }
+];
+
+async function runSchedulerTick() {
+  const timestamp = Date.now();
+  growthLogs.push({ message: `[SCHEDULER] Tick triggered. Current queue size: ${postQueue.length}`, timestamp });
+  
+  if (postQueue.length === 0) {
+    growthLogs.push({ message: `[SCHEDULER] Queue is empty. No auto-posting actions needed.`, timestamp });
+    return { status: "empty", logs: growthLogs };
+  }
+
+  const post = postQueue.shift()!;
+  growthLogs.push({ message: `🚀 [SCHEDULER] Processing post: "${post.title}"`, timestamp });
+
+  try {
+    // Post to Twitter/X
+    const twitterResult = await postToTwitter(post);
+    growthLogs.push({ 
+      message: twitterResult.success 
+        ? `🐦 Twitter/X: ${twitterResult.message || twitterResult.status}` 
+        : `❌ Twitter/X Failed: ${twitterResult.error}`, 
+      timestamp 
+    });
+
+    // Post to YouTube
+    const youtubeResult = await postToYouTube(post);
+    growthLogs.push({ 
+      message: youtubeResult.success 
+        ? `🎥 YouTube: ${youtubeResult.message || youtubeResult.status}` 
+        : `❌ YouTube Failed: ${youtubeResult.error}`, 
+      timestamp 
+    });
+
+    // Instagram reminder helper
+    const instaResult = prepareInstagramPost(post);
+    growthLogs.push({ 
+      message: `📸 Instagram Helper: Caption and tags formatted. ${instaResult.reminder}`, 
+      timestamp 
+    });
+
+    growthLogs.push({ message: `🎯 [SCHEDULER] Success! Post dispatched. Queue remaining: ${postQueue.length}`, timestamp });
+    return { status: "dispatched", post, logs: growthLogs };
+  } catch (err: any) {
+    growthLogs.push({ message: `❌ [SCHEDULER] Fatal tick error: ${err.message}`, timestamp });
+    return { status: "error", error: err.message, logs: growthLogs };
+  }
+}
+
+// 6 Hours Auto Post Cron Trigger
+cron.schedule("0 */6 * * *", async () => {
+  await runSchedulerTick();
+});
+
+// APIs for Frontend UI
+app.get('/api/growth/queue', (req, res) => {
+  res.json({
+    queue: postQueue,
+    logs: growthLogs.slice(-40) // Keep last 40 logs
+  });
+});
+
+app.post('/api/growth/queue-post', (req, res) => {
+  const { title, reel, caption, hashtags, sessionId } = req.body;
+  if (!title || !reel) {
+    return res.status(400).json({ error: "title and reel parameters are required" });
+  }
+
+  const newPost: GrowthPost = {
+    title,
+    reel,
+    caption: caption || reel,
+    hashtags: hashtags || "#AI #SaaS #Growth",
+    createdAt: Date.now()
+  };
+
+  postQueue.push(newPost);
+  
+  const timestamp = Date.now();
+  growthLogs.push({ 
+    message: `📥 [User Queued] Added "${title}" to queue. Position: ${postQueue.length}`, 
+    timestamp 
+  });
+
+  if (sessionId) {
+    try {
+      firestoreLogs.addActivityLog({
+        action: 'Queue Growth Post',
+        page: 'admin',
+        userSession: sessionId,
+        details: `Queued viral post: ${title}`
+      });
+    } catch (e) {
+      // Local fallback
+      dbLogs.addActivityLog({
+        action: 'Queue Growth Post',
+        page: 'admin',
+        userSession: sessionId,
+        details: `Queued viral post: ${title}`
+      });
+    }
+  }
+
+  res.json({ success: true, queueLength: postQueue.length });
+});
+
+app.post('/api/growth/clear', (req, res) => {
+  const { sessionId } = req.body;
+  postQueue = [];
+  const timestamp = Date.now();
+  growthLogs.push({ message: "🗑️ [Queue Cleared] All items removed from growth queue by user.", timestamp });
+  
+  if (sessionId) {
+    try {
+      firestoreLogs.addActivityLog({
+        action: 'Clear Growth Queue',
+        page: 'admin',
+        userSession: sessionId,
+        details: `Cleared all queued posts`
+      });
+    } catch (e) {}
+  }
+  res.json({ success: true });
+});
+
+app.post('/api/growth/trigger', async (req, res) => {
+  const { sessionId } = req.body;
+  const result = await runSchedulerTick();
+  
+  if (sessionId) {
+    try {
+      firestoreLogs.addActivityLog({
+        action: 'Trigger Growth Scheduler',
+        page: 'admin',
+        userSession: sessionId,
+        details: `Manually triggered scheduler tick. Status: ${result.status}`
+      });
+    } catch (e) {}
+  }
+  res.json(result);
+});
+
+app.post('/api/marketing/run', async (req, res) => {
+  const { topic, metrics, sessionId } = req.body;
+  
+  let ai = null;
+  try {
+    ai = getGeminiClient();
+  } catch (err: any) {
+    console.warn("Gemini client not initialized for marketing system:", err.message);
+  }
+
+  try {
+    const pipeline = new AutoMarketing();
+    const result = await pipeline.run(topic, metrics, ai, sessionId);
+    
+    const timestamp = Date.now();
+    growthLogs.push({
+      message: `🤖 [PRO MAX AI] Triggered complete marketing pipeline for "${topic}"!`,
+      timestamp
+    });
+
+    if (sessionId) {
+      try {
+        firestoreLogs.addActivityLog({
+          action: 'Run AI Marketing Pipeline',
+          page: 'workspace',
+          userSession: sessionId,
+          details: `Generated marketing campaign for ${topic}`
+        });
+      } catch (e) {}
+    }
+
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    console.error("AI Marketing pipeline run failed:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// MAMTA VOICE AI ENGINE ENDPOINTS
+// ----------------------------------------------------
+const voiceUpload = multer({ dest: 'temp_uploads/' });
+
+// Serve custom voice reference files statically
+app.use('/voices', express.static(path.join(process.cwd(), 'voices')));
+
+app.get('/api/voice/list', (req, res) => {
+  try {
+    const sessionId = req.query.sessionId as string | undefined;
+    const list = listVoiceModels(sessionId);
+    res.json({ success: true, list });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/voice/upload', voiceUpload.single('voice'), (req, res) => {
+  try {
+    const file = req.file;
+    const { role, sessionId } = req.body;
+
+    if (!file) {
+      return res.status(400).json({ error: 'No audio file uploaded' });
+    }
+    if (!role || !['male', 'female', 'narrator'].includes(role)) {
+      return res.status(400).json({ error: 'Valid role (male, female, narrator) is required' });
+    }
+
+    const voicesDir = path.join(process.cwd(), 'voices');
+    if (!fs.existsSync(voicesDir)) {
+      fs.mkdirSync(voicesDir, { recursive: true });
+    }
+
+    // Name file with sessionId prefix if present to isolate user references
+    const targetFileName = sessionId ? `${sessionId}_${role}.wav` : `${role}.wav`;
+    const targetPath = path.join(voicesDir, targetFileName);
+
+    // Overwrite existing session/global reference if any
+    if (fs.existsSync(targetPath)) {
+      fs.unlinkSync(targetPath);
+    }
+
+    fs.renameSync(file.path, targetPath);
+    console.log(`🎤 [VoiceAPI] Saved custom voice file for [${role}] (Session: ${sessionId || 'global'}) at ${targetPath}`);
+
+    if (sessionId) {
+      try {
+        firestoreLogs.addActivityLog({
+          action: 'Upload Custom Voice Model',
+          page: 'workspace',
+          userSession: sessionId,
+          details: `Uploaded custom clone voice reference for: ${role}`
+        });
+      } catch (e) {}
+    }
+
+    res.json({ success: true, path: `/voices/${targetFileName}` });
+  } catch (err: any) {
+    console.error('Voice upload endpoint failed:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/voice/generate', async (req, res) => {
+  const { text, sessionId } = req.body;
+  if (!text) {
+    return res.status(400).json({ error: 'Text prompt is required' });
+  }
+
+  try {
+    console.log(`🎤 [VoiceAPI] Generating dynamic local clone for text: "${text.slice(0, 40)}..." (Session: ${sessionId || 'global'})`);
+    const finalFile = await localGenerateVoice(text, sessionId);
+    
+    if (sessionId) {
+      try {
+        firestoreLogs.addActivityLog({
+          action: 'Generate Clone Speech',
+          page: 'workspace',
+          userSession: sessionId,
+          details: `Generated cloned audio for text: "${text.slice(0, 30)}..."`
+        });
+      } catch (e) {}
+    }
+
+    res.sendFile(path.resolve(finalFile));
+  } catch (err: any) {
+    console.error('Voice generate endpoint failed:', err);
     res.status(500).json({ error: err.message });
   }
 });

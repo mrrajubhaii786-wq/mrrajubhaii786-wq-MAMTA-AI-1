@@ -20,19 +20,21 @@ import {
   Square,
   Terminal,
   RefreshCw,
-  Zap
+  Zap,
+  Mic
 } from 'lucide-react';
 import { SystemMetrics, ActivityLog, WikiEntry } from '../types';
 import { MamtaBrainV10 } from '../brain/MamtaBrainV10';
 import { AutonomousLoop } from '../brain/AutonomousLoop';
 import { db } from '../lib/firebase';
+import MamtaVoiceStudio from './MamtaVoiceStudio';
 
 interface AdminViewProps {
   sessionId: string;
 }
 
 export default function AdminView({ sessionId }: AdminViewProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'metrics' | 'wiki' | 'autonomous'>('metrics');
+  const [activeSubTab, setActiveSubTab] = useState<'metrics' | 'wiki' | 'autonomous' | 'voice'>('metrics');
   
   // States
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
@@ -346,6 +348,18 @@ export default function AdminView({ sessionId }: AdminViewProps) {
         >
           <Brain className="w-3.5 h-3.5 text-indigo-400" />
           <span>V10 Autonomous Brain ({learnedKnowledge.length})</span>
+        </button>
+        <button
+          id="admin_tab_voice_selector"
+          onClick={() => setActiveSubTab('voice')}
+          className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+            activeSubTab === 'voice' 
+              ? 'bg-pink-500/15 border border-pink-500/30 text-pink-400 font-bold' 
+              : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200 border border-transparent'
+          }`}
+        >
+          <Mic className="w-3.5 h-3.5 text-pink-400" />
+          <span>🎙️ System Voices Control (Master)</span>
         </button>
       </div>
 
@@ -899,6 +913,22 @@ export default function AdminView({ sessionId }: AdminViewProps) {
 
         </div>
       )}
+
+      {activeSubTab === 'voice' && (
+        <div className="flex-1 overflow-y-auto pr-1 h-[calc(100vh-140px)] custom-scrollbar pb-8">
+          <div className="bg-slate-900/40 border border-slate-800/50 rounded-2xl p-4 mb-4 backdrop-blur-md">
+            <h3 className="text-sm font-semibold text-slate-200 mb-1 flex items-center gap-2">
+              <Mic className="w-4 h-4 text-pink-400 animate-pulse" />
+              Administrative Master Voice Dashboard
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Updates made in this section are system-wide and permanent. Regular users will inherit these default voices unless they record/upload their own custom voice profiles in their workspace Launch Hub page.
+            </p>
+          </div>
+          <MamtaVoiceStudio sessionId={sessionId} isAdmin={true} />
+        </div>
+      )}
+
       {showWikiModal && (
         <div id="wiki_crud_modal_overlay" className="fixed inset-0 bg-slate-950/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 max-w-xl w-full shadow-2xl space-y-4 animate-in fade-in duration-200">

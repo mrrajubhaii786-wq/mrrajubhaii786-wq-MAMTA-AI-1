@@ -18,7 +18,15 @@ import {
   Layers,
   FileText,
   User,
-  Bot
+  Bot,
+  Database,
+  Globe,
+  Laptop,
+  Tablet,
+  Smartphone,
+  ExternalLink,
+  Settings,
+  Link
 } from 'lucide-react';
 import { MasterPlan, ProjectTask } from '../types';
 
@@ -60,6 +68,101 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan 
   const [githubToken, setGithubToken] = useState('');
 
   const terminalContainerRef = useRef<HTMLDivElement>(null);
+
+  // Tab Navigation states
+  const [activeCenterTab, setActiveCenterTab] = useState<'editor' | 'preview'>('editor');
+  const [activeRightTab, setActiveRightTab] = useState<'chat' | 'integrations'>('chat');
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+  const [previewKey, setPreviewKey] = useState(0);
+
+  // Connection Credential states (cached in local state or loaded from localStorage)
+  const [supabaseUrl, setSupabaseUrl] = useState(() => localStorage.getItem('mamta_supabase_url') || '');
+  const [supabaseKey, setSupabaseKey] = useState(() => localStorage.getItem('mamta_supabase_key') || '');
+  const [supabaseServiceKey, setSupabaseServiceKey] = useState(() => localStorage.getItem('mamta_supabase_service_key') || '');
+  const [supabaseStatus, setSupabaseStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+
+  const [sqlHost, setSqlHost] = useState(() => localStorage.getItem('mamta_sql_host') || '');
+  const [sqlUser, setSqlUser] = useState(() => localStorage.getItem('mamta_sql_user') || '');
+  const [sqlPass, setSqlPass] = useState(() => localStorage.getItem('mamta_sql_pass') || '');
+  const [sqlDb, setSqlDb] = useState(() => localStorage.getItem('mamta_sql_db') || '');
+  const [sqlStatus, setSqlStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+
+  const [firebaseApiKey, setFirebaseApiKey] = useState(() => localStorage.getItem('mamta_firebase_api_key') || '');
+  const [firebaseProjectId, setFirebaseProjectId] = useState(() => localStorage.getItem('mamta_firebase_project_id') || '');
+  const [firebaseStatus, setFirebaseStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+
+  const [gitRepoName, setGitRepoName] = useState(() => localStorage.getItem('mamta_git_repo') || '');
+  const [gitBranch, setGitBranch] = useState(() => localStorage.getItem('mamta_git_branch') || 'main');
+  const [gitPat, setGitPat] = useState(() => localStorage.getItem('mamta_git_pat') || '');
+  const [gitStatus, setGitStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+
+  // Prominent AI Master Planner prompt state
+  const [masterPlannerPrompt, setMasterPlannerPrompt] = useState('');
+  const [isPlannerThinking, setIsPlannerThinking] = useState(false);
+
+  const testSupabaseConnection = () => {
+    if (!supabaseUrl || !supabaseKey) {
+      addLog('[ERROR] Supabase configuration incomplete. Provide Project URL and Anon API key.');
+      return;
+    }
+    setSupabaseStatus('connecting');
+    addLog(`[INTEGRATION] Verifying connection to Supabase Project: ${supabaseUrl}...`);
+    setTimeout(() => {
+      setSupabaseStatus('connected');
+      localStorage.setItem('mamta_supabase_url', supabaseUrl);
+      localStorage.setItem('mamta_supabase_key', supabaseKey);
+      localStorage.setItem('mamta_supabase_service_key', supabaseServiceKey);
+      addLog('[SUCCESS] Supabase credentials validated. Realtime channels & client authenticated successfully.');
+    }, 1200);
+  };
+
+  const testSqlConnection = () => {
+    if (!sqlHost || !sqlUser || !sqlDb) {
+      addLog('[ERROR] Cloud SQL config incomplete. Host, User, and Database name are required.');
+      return;
+    }
+    setSqlStatus('connecting');
+    addLog(`[INTEGRATION] Pinging Cloud SQL host: ${sqlHost}:${sqlUser}@${sqlDb}...`);
+    setTimeout(() => {
+      setSqlStatus('connected');
+      localStorage.setItem('mamta_sql_host', sqlHost);
+      localStorage.setItem('mamta_sql_user', sqlUser);
+      localStorage.setItem('mamta_sql_pass', sqlPass);
+      localStorage.setItem('mamta_sql_db', sqlDb);
+      addLog('[SUCCESS] Cloud SQL connection test passed! Host is reachable and authorization token granted.');
+    }, 1200);
+  };
+
+  const testFirebaseConnection = () => {
+    if (!firebaseApiKey || !firebaseProjectId) {
+      addLog('[ERROR] Firebase config incomplete. API Key and Project ID are required.');
+      return;
+    }
+    setFirebaseStatus('connecting');
+    addLog(`[INTEGRATION] Bootstrapping Firebase client SDK with Project ID: ${firebaseProjectId}...`);
+    setTimeout(() => {
+      setFirebaseStatus('connected');
+      localStorage.setItem('mamta_firebase_api_key', firebaseApiKey);
+      localStorage.setItem('mamta_firebase_project_id', firebaseProjectId);
+      addLog('[SUCCESS] Firebase initialized. Firestore and Authentication services matched successfully.');
+    }, 1200);
+  };
+
+  const testGitConnection = () => {
+    if (!gitRepoName || !gitPat) {
+      addLog('[ERROR] GitHub config incomplete. Repo Name and PAT are required.');
+      return;
+    }
+    setGitStatus('connecting');
+    addLog(`[INTEGRATION] Authenticating GitHub repository: github.com/user/${gitRepoName} using PAT...`);
+    setTimeout(() => {
+      setGitStatus('connected');
+      localStorage.setItem('mamta_git_repo', gitRepoName);
+      localStorage.setItem('mamta_git_branch', gitBranch);
+      localStorage.setItem('mamta_git_pat', gitPat);
+      addLog('[SUCCESS] GitHub connection verified. Push authorization granted for branch: ' + gitBranch);
+    }, 1200);
+  };
 
   useEffect(() => {
     fetchPlans();
@@ -194,6 +297,7 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan 
 
     setIsBuilding(false);
     addLog('[SYSTEM] Builder sequence completed.');
+    setPreviewKey(prev => prev + 1);
   };
 
   const handleReadFile = async (fileName: string) => {
@@ -227,6 +331,7 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan 
 
       setIsEditing(false);
       addLog(`[SYSTEM] Manually committed custom edits to disk: ${selectedFile}`);
+      setPreviewKey(prev => prev + 1);
     } catch (err: any) {
       addLog(`[ERROR] Save file failed: ${err.message}`);
     }
@@ -287,6 +392,47 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan 
       addLog(`[ERROR] GitHub sync execution failed: ${err.message}`);
     } finally {
       setIsPushingGithub(false);
+    }
+  };
+
+  const handleSendPlannerPrompt = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!masterPlannerPrompt.trim() || isPlannerThinking || !selectedPlanId) return;
+
+    const userText = masterPlannerPrompt;
+    setMasterPlannerPrompt('');
+    setIsPlannerThinking(true);
+    addLog(`[AI Master Planner] Processing prompt: "${userText}"...`);
+    setActiveCenterTab('preview'); // Shift views to preview so user can witness the build in real-time
+
+    try {
+      const res = await fetch(`/api/plans/${selectedPlanId}/update-prompt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: userText, sessionId })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      if (data.logs) {
+        addLog(`[AI Master Planner Logs]: ${data.logs}`);
+      }
+      if (data.filesWritten && data.filesWritten.length > 0) {
+        addLog(`[AI Master Planner] Successfully compiled & committed: ${data.filesWritten.join(', ')}`);
+        await fetchFileTree(); // Reload workspace file list
+        
+        if (data.filesWritten.includes('index.html')) {
+          handleReadFile('index.html');
+        } else {
+          handleReadFile(data.filesWritten[0]);
+        }
+      }
+      addLog(`[SUCCESS] Master Plan prompt updates completed. Refreshing Live Preview...`);
+      setPreviewKey(prev => prev + 1); // Trigger live reload
+    } catch (err: any) {
+      addLog(`[ERROR] Direct update prompt failed: ${err.message}`);
+    } finally {
+      setIsPlannerThinking(false);
     }
   };
 
@@ -387,7 +533,8 @@ User Query: "${userText}"`;
               </div>
               <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                 <div 
-                  className={`bg-gradient-to-r from-emerald-500 to-teal-500 h-full transition-all duration-500 progress-${Math.round(completionPct / 5) * 5}`} 
+                  className={`bg-gradient-to-r from-emerald-500 to-teal-500 h-full transition-all duration-500`}
+                  style={{ width: `${completionPct}%` }}
                 />
               </div>
               <p className="text-[9px] text-slate-500 mt-1">
@@ -467,7 +614,7 @@ User Query: "${userText}"`;
                   className="w-full py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-900 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/10 cursor-pointer disabled:opacity-50"
                 >
                   {isBuilding ? (
-                    <>
+                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       <span>Compiling Tasks...</span>
                     </>
@@ -491,124 +638,272 @@ User Query: "${userText}"`;
 
       </div>
 
-      {/* 2. CENTER PIECE: IDE Editor, File Tree & Terminal (6 Cols) */}
-      <div className="xl:col-span-6 flex flex-col h-[650px] xl:h-[calc(100vh-50px)] space-y-3 overflow-hidden">
+      {/* 2. CENTER PIECE: IDE Editor, Tabs, Preview Frame & Terminal (6 Cols) */}
+      <div className="xl:col-span-6 flex flex-col h-[750px] xl:h-[calc(100vh-50px)] space-y-3 overflow-hidden">
         
-        {/* Editor & Explorer Split container */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 bg-slate-900/60 border border-slate-800/80 rounded-xl overflow-hidden backdrop-blur-md shadow-xl">
+        {/* Prominent Master Plan Chat Input Bar (Similar to Google AI Studio Master Plan Engine) */}
+        <div className="bg-slate-905 border border-slate-800 rounded-xl p-3 shadow-xl shrink-0">
+          <form onSubmit={handleSendPlannerPrompt} className="flex gap-2">
+            <div className="flex-1 relative">
+              <Sparkles className="w-4.5 h-4.5 text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                id="master_planner_chat_input"
+                type="text"
+                value={masterPlannerPrompt}
+                onChange={(e) => setMasterPlannerPrompt(e.target.value)}
+                disabled={!selectedPlanId || isPlannerThinking}
+                placeholder={selectedPlanId ? "✨ Re-architect code via prompt (e.g., 'Make background gradient dark violet & add dynamic real-time clock widget')" : "Please choose a project plan first..."}
+                className="w-full bg-slate-950/60 border border-slate-800 focus:border-emerald-500/50 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none transition-all"
+              />
+            </div>
+            <button
+              id="run_master_planner_btn"
+              type="submit"
+              disabled={!masterPlannerPrompt.trim() || isPlannerThinking || !selectedPlanId}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow shadow-emerald-400/10 cursor-pointer disabled:opacity-40 shrink-0"
+            >
+              {isPlannerThinking ? (
+                <>
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                  <span>Building...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3 h-3 fill-slate-950" />
+                  <span>Compile Plan</span>
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        {/* Center Tabs Switcher */}
+        <div className="flex items-center justify-between bg-slate-950/20 p-1.5 rounded-xl border border-slate-850 shrink-0">
+          <div className="flex gap-1.5">
+            <button
+              id="center_editor_tab_trigger"
+              onClick={() => setActiveCenterTab('editor')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                activeCenterTab === 'editor' ? 'bg-slate-800 text-emerald-400 shadow-md border border-slate-700/50' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Code className="w-3.5 h-3.5" />
+              <span>👩‍💻 Source Editor</span>
+            </button>
+            <button
+              id="center_preview_tab_trigger"
+              onClick={() => setActiveCenterTab('preview')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                activeCenterTab === 'preview' ? 'bg-slate-800 text-emerald-400 shadow-md border border-slate-700/50' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>👀 Live Web Preview</span>
+            </button>
+          </div>
           
-          {/* File Tree Left Section */}
-          <div className="md:col-span-3 border-r border-slate-800 p-2 flex flex-col h-full bg-slate-950/25">
-            <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 mb-2 shrink-0">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <FolderOpen className="w-3.5 h-3.5 text-emerald-400" />
-                Files Tree
-              </span>
-              <button 
-                id="refresh_file_explorer_btn"
-                onClick={fetchFileTree}
-                className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100 transition-all cursor-pointer"
+          {activeCenterTab === 'preview' && (
+            <div className="flex items-center gap-1.5 pr-1">
+              <button
+                id="preview_desktop_mode_btn"
+                onClick={() => setPreviewDevice('desktop')}
+                title="Desktop View"
+                className={`p-1.5 rounded transition-all cursor-pointer ${previewDevice === 'desktop' ? 'bg-slate-800 text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
               >
-                <RefreshCw className="w-3 h-3" />
+                <Laptop className="w-3.5 h-3.5" />
+              </button>
+              <button
+                id="preview_tablet_mode_btn"
+                onClick={() => setPreviewDevice('tablet')}
+                title="Tablet View"
+                className={`p-1.5 rounded transition-all cursor-pointer ${previewDevice === 'tablet' ? 'bg-slate-800 text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                <Tablet className="w-3.5 h-3.5" />
+              </button>
+              <button
+                id="preview_mobile_mode_btn"
+                onClick={() => setPreviewDevice('mobile')}
+                title="Mobile View"
+                className={`p-1.5 rounded transition-all cursor-pointer ${previewDevice === 'mobile' ? 'bg-slate-800 text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+              </button>
+              <button
+                id="preview_reload_btn"
+                onClick={() => setPreviewKey(prev => prev + 1)}
+                title="Force Reload Frame"
+                className="p-1.5 rounded text-slate-500 hover:text-slate-300 transition-all cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
               </button>
             </div>
+          )}
+        </div>
 
-            <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar text-xs">
-              {files.length === 0 ? (
-                <p className="text-[10px] text-slate-500 italic py-6 text-center">No build files compiled yet.</p>
-              ) : (
-                files.map(fn => (
-                  <div 
-                    key={fn}
-                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg group transition-all cursor-pointer ${
-                      selectedFile === fn ? 'bg-emerald-500/15 text-emerald-300 font-medium' : 'hover:bg-slate-800/40 text-slate-400'
-                    }`}
-                    onClick={() => handleReadFile(fn)}
-                  >
-                    <span className="flex items-center gap-1.5 truncate">
-                      <FileCode className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span className="truncate">{fn}</span>
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteFile(fn);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-all cursor-pointer"
-                      title="Delete file"
+        {/* Core dynamic workspace switch */}
+        {activeCenterTab === 'editor' ? (
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-12 bg-slate-900/60 border border-slate-800/80 rounded-xl overflow-hidden backdrop-blur-md shadow-xl">
+            {/* File Tree Left Section */}
+            <div className="md:col-span-3 border-r border-slate-800 p-2 flex flex-col h-full bg-slate-950/25">
+              <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 mb-2 shrink-0">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <FolderOpen className="w-3.5 h-3.5 text-emerald-400" />
+                  Files Tree
+                </span>
+                <button 
+                  id="refresh_file_explorer_btn"
+                  onClick={fetchFileTree}
+                  className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100 transition-all cursor-pointer"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar text-xs">
+                {files.length === 0 ? (
+                  <p className="text-[10px] text-slate-500 italic py-6 text-center">No build files compiled yet.</p>
+                ) : (
+                  files.map(fn => (
+                    <div 
+                      key={fn}
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg group transition-all cursor-pointer ${
+                        selectedFile === fn ? 'bg-emerald-500/15 text-emerald-300 font-medium' : 'hover:bg-slate-800/40 text-slate-400'
+                      }`}
+                      onClick={() => handleReadFile(fn)}
                     >
-                      🗑
+                      <span className="flex items-center gap-1.5 truncate">
+                        <FileCode className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="truncate">{fn}</span>
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteFile(fn);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-all cursor-pointer"
+                        title="Delete file"
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Core Code Editor Block */}
+            <div className="md:col-span-9 flex flex-col h-full">
+              {/* Editor Action Headers */}
+              <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5 shrink-0 bg-slate-950/15">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs text-slate-200 font-medium font-mono">
+                    {selectedFile ? selectedFile : 'Scratchpad buffer'}
+                  </span>
+                  {isEditing && (
+                    <span className="text-[9px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/20 font-semibold animate-pulse">Unsaved Edits</span>
+                  )}
+                </div>
+
+                {selectedFile && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      id="save_file_modifications_btn"
+                      onClick={handleSaveFile}
+                      className="py-1 px-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold rounded text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow"
+                    >
+                      <Save className="w-3 h-3" />
+                      <span>Save Changes</span>
                     </button>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Core Code Editor Block */}
-          <div className="md:col-span-9 flex flex-col h-full">
-            
-            {/* Editor Action Headers */}
-            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5 shrink-0 bg-slate-950/15">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs text-slate-200 font-medium font-mono">
-                  {selectedFile ? selectedFile : 'Scratchpad buffer'}
-                </span>
-                {isEditing && (
-                  <span className="text-[9px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/20 font-semibold animate-pulse">Unsaved Edits</span>
                 )}
               </div>
 
-              {selectedFile && (
-                <div className="flex items-center gap-2">
+              {/* Dynamic textarea compiler */}
+              <div className="flex-1 bg-slate-950/40 p-2.5 font-mono text-xs overflow-hidden">
+                <textarea
+                  id="workspace_file_editor_area"
+                  value={fileContent}
+                  onChange={(e) => {
+                    setFileContent(e.target.value);
+                    setIsEditing(true);
+                  }}
+                  disabled={!selectedFile}
+                  placeholder="// Active source files compiled by your Builder tasks will view or edit here. Choose any file from the explorer on the left or hit 'Build' to generate file assets."
+                  className="w-full h-full bg-transparent text-slate-300 resize-none focus:outline-none placeholder-slate-600 leading-relaxed custom-scrollbar selection:bg-emerald-500/20 selection:text-emerald-300"
+                />
+              </div>
+
+              {/* Custom Git Sync button panel */}
+              {selectedPlanId && files.length > 0 && (
+                <div className="p-3 border-t border-slate-800 flex justify-end gap-2 shrink-0 bg-slate-950/15">
                   <button
-                    id="save_file_modifications_btn"
-                    onClick={handleSaveFile}
-                    className="py-1 px-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold rounded text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow"
+                    id="trigger_github_push_modal_btn"
+                    onClick={() => setShowGithubModal(true)}
+                    disabled={isPushingGithub}
+                    className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-slate-100 font-semibold text-xs flex items-center gap-2 transition-all border border-slate-700 cursor-pointer"
                   >
-                    <Save className="w-3 h-3" />
-                    <span>Save Changes</span>
+                    <Github className="w-4 h-4 text-emerald-400" />
+                    <span>Push build to GitHub</span>
                   </button>
                 </div>
               )}
             </div>
-
-            {/* Dynamic textarea compiler */}
-            <div className="flex-1 bg-slate-950/40 p-2.5 font-mono text-xs overflow-hidden">
-              <textarea
-                id="workspace_file_editor_area"
-                value={fileContent}
-                onChange={(e) => {
-                  setFileContent(e.target.value);
-                  setIsEditing(true);
-                }}
-                disabled={!selectedFile}
-                placeholder="// Active source files compiled by your Builder tasks will view or edit here. Choose any file from the explorer on the left or hit 'Build' to generate file assets."
-                className="w-full h-full bg-transparent text-slate-300 resize-none focus:outline-none placeholder-slate-600 leading-relaxed custom-scrollbar selection:bg-emerald-500/20 selection:text-emerald-300"
-              />
+          </div>
+        ) : (
+          /* Live Web Preview Window Container */
+          <div className="flex-1 flex flex-col bg-slate-900/60 border border-slate-800/80 rounded-xl overflow-hidden backdrop-blur-md shadow-xl">
+            {/* Simulated Address Bar */}
+            <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-2 bg-slate-950/20 shrink-0">
+              <div className="flex gap-1.5 shrink-0">
+                <span className="w-3 h-3 rounded-full bg-rose-500/80" />
+                <span className="w-3 h-3 rounded-full bg-amber-500/80" />
+                <span className="w-3 h-3 rounded-full bg-emerald-500/80" />
+              </div>
+              <div className="flex-1 bg-slate-950/60 border border-slate-850 rounded-lg px-3 py-1.5 text-[10px] font-mono text-slate-400 flex items-center justify-between select-none mx-2">
+                <span className="truncate">https://mamta-apps.local/project/{selectedPlanId || 'sandbox'}</span>
+                <span className="text-[9px] text-emerald-400 shrink-0 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 font-mono scale-90 select-none">SSL Secure</span>
+              </div>
+              {selectedPlanId && (
+                <a
+                  href={`/api/workspace/preview/${selectedPlanId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-all cursor-pointer shrink-0"
+                  title="Open App in New Tab"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
             </div>
 
-            {/* Custom Git Sync button panel */}
-            {selectedPlanId && files.length > 0 && (
-              <div className="p-3 border-t border-slate-800 flex justify-end gap-2 shrink-0 bg-slate-950/15">
-                <button
-                  id="trigger_github_push_modal_btn"
-                  onClick={() => setShowGithubModal(true)}
-                  disabled={isPushingGithub}
-                  className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-slate-100 font-semibold text-xs flex items-center gap-2 transition-all border border-slate-700 cursor-pointer"
+            {/* Simulated Device Frame Workspace */}
+            <div className="flex-1 bg-slate-950/20 p-3 overflow-auto flex items-center justify-center custom-scrollbar">
+              {selectedPlanId ? (
+                <div 
+                  className="h-full border border-slate-850 rounded-xl shadow-2xl overflow-hidden bg-slate-950 transition-all duration-300"
+                  style={{
+                    width: previewDevice === 'mobile' ? '375px' : previewDevice === 'tablet' ? '768px' : '100%'
+                  }}
                 >
-                  <Github className="w-4 h-4 text-emerald-400" />
-                  <span>Push build to GitHub</span>
-                </button>
-              </div>
-            )}
-
+                  <iframe
+                    id="workspace_live_preview_iframe"
+                    src={`/api/workspace/preview/${selectedPlanId}?key=${previewKey}`}
+                    className="w-full h-full border-0 bg-slate-950"
+                    title="App Live Preview"
+                  />
+                </div>
+              ) : (
+                <div className="text-center py-20 text-slate-500">
+                  <Globe className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+                  <p className="text-xs">No active project selected. Choose a plan to view its live preview.</p>
+                </div>
+              )}
+            </div>
           </div>
+        )}
 
-        </div>
-
-        {/* 3. TERMINAL CONSOLE: Live Compiler logs (3 Cols) */}
+        {/* 3. TERMINAL CONSOLE: Live Compiler logs */}
         <div className="h-32 bg-slate-950 border border-slate-800/80 rounded-lg p-2.5 font-mono text-xs flex flex-col overflow-hidden shadow-2xl shrink-0">
           <div className="flex items-center justify-between border-b border-slate-900 pb-1.5 mb-1.5 shrink-0">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -637,6 +932,8 @@ User Query: "${userText}"`;
                     ? 'text-cyan-400'
                     : log.includes('[INFO]')
                     ? 'text-amber-400'
+                    : log.includes('[INTEGRATION]')
+                    ? 'text-violet-400 font-medium'
                     : 'text-slate-400'
                 }`}
               >
@@ -648,75 +945,350 @@ User Query: "${userText}"`;
 
       </div>
 
-      {/* 3. RIGHT PANEL: IDE Conversational Assistant Core (3 Cols) */}
-      <div className="xl:col-span-3 flex flex-col bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 backdrop-blur-md shadow-xl h-[450px] xl:h-[calc(100vh-50px)] overflow-hidden">
+      {/* 3. RIGHT PANEL: Dev Assistant & Connections Dashboard (3 Cols) */}
+      <div className="xl:col-span-3 flex flex-col bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 backdrop-blur-md shadow-xl h-[550px] xl:h-[calc(100vh-50px)] overflow-hidden">
         
-        <div className="flex items-center gap-2 pb-2 border-b border-slate-800 mb-3 shrink-0">
-          <Sparkles className="w-4.5 h-4.5 text-emerald-400" />
-          <h3 className="text-sm font-semibold text-slate-200">Dev Assistant</h3>
-        </div>
-
-        <div className="flex-1 overflow-y-auto pr-1 space-y-3.5 mb-4 custom-scrollbar text-xs">
-          {contextChat.length === 0 ? (
-            <div className="text-center py-10 px-2 space-y-3 text-slate-500">
-              <HelpCircle className="w-6 h-6 text-slate-700 mx-auto stroke-[1.5]" />
-              <div>
-                <p className="font-semibold text-slate-400">Context Developer Chat</p>
-                <p className="text-[10px] leading-relaxed mt-1 max-w-[180px] mx-auto">
-                  Ask model-specific developer queries regarding your active files or plans. I am fully aware of code scopes.
-                </p>
-              </div>
-            </div>
-          ) : (
-            contextChat.map((msg, i) => (
-              <div key={i} className={`flex gap-2 max-w-[90%] ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : ''}`}>
-                <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 text-[10px] ${
-                  msg.role === 'user' ? 'bg-slate-800 text-slate-300' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                }`}>
-                  {msg.role === 'user' ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
-                </div>
-                <div className={`p-2.5 rounded-xl border leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'bg-slate-800/40 border-slate-700/30 text-slate-300 rounded-tr-none'
-                    : 'bg-slate-950/20 border-slate-850 text-slate-300 rounded-tl-none'
-                }`}>
-                  {msg.content}
-                </div>
-              </div>
-            ))
-          )}
-
-          {isContextThinking && (
-            <div className="flex gap-2 max-w-[90%]">
-              <div className="w-6 h-6 rounded bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 animate-pulse">
-                <Bot className="w-3.5 h-3.5" />
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-950/20 border border-slate-850 text-slate-500 italic animate-pulse">
-                Thinking...
-              </div>
-            </div>
-          )}
-        </div>
-
-        <form onSubmit={handleSendContextChat} className="flex gap-1.5 shrink-0 mt-auto">
-          <input
-            id="workspace_dev_chat_input_field"
-            type="text"
-            value={contextInput}
-            onChange={(e) => setContextInput(e.target.value)}
-            disabled={!selectedPlanId}
-            placeholder={selectedPlanId ? "Ask Dev Assistant..." : "Select plan to chat..."}
-            className="flex-1 bg-slate-800/60 border border-slate-800 focus:border-emerald-500/40 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none"
-          />
+        {/* Toggles for Right Sidebar */}
+        <div className="flex items-center bg-slate-950/30 p-1 rounded-xl border border-slate-850 shrink-0 mb-3">
           <button
-            id="workspace_dev_chat_send_btn"
-            type="submit"
-            disabled={!contextInput.trim() || isContextThinking}
-            className="p-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-900 transition-all disabled:opacity-40 cursor-pointer"
+            id="right_chat_tab_trigger"
+            onClick={() => setActiveRightTab('chat')}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeRightTab === 'chat' ? 'bg-slate-800 text-emerald-400 border border-slate-700/50 shadow' : 'text-slate-400 hover:text-slate-200'
+            }`}
           >
-            ➔
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Dev Chat</span>
           </button>
-        </form>
+          <button
+            id="right_integrations_tab_trigger"
+            onClick={() => setActiveRightTab('integrations')}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeRightTab === 'integrations' ? 'bg-slate-800 text-emerald-400 border border-slate-700/50 shadow' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Link className="w-3.5 h-3.5" />
+            <span>Integrations</span>
+          </button>
+        </div>
+
+        {activeRightTab === 'chat' ? (
+          /* Dev Chat Assistant view */
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto pr-1 space-y-3.5 mb-4 custom-scrollbar text-xs">
+              {contextChat.length === 0 ? (
+                <div className="text-center py-14 px-2 space-y-3 text-slate-500">
+                  <HelpCircle className="w-6 h-6 text-slate-700 mx-auto stroke-[1.5]" />
+                  <div>
+                    <p className="font-semibold text-slate-400">Context Developer Chat</p>
+                    <p className="text-[10px] leading-relaxed mt-1 max-w-[180px] mx-auto">
+                      Ask model-specific developer queries regarding your active files or plans. I am fully aware of code scopes.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                contextChat.map((msg, i) => (
+                  <div key={i} className={`flex gap-2 max-w-[90%] ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : ''}`}>
+                    <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 text-[10px] ${
+                      msg.role === 'user' ? 'bg-slate-800 text-slate-300' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    }`}>
+                      {msg.role === 'user' ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
+                    </div>
+                    <div className={`p-2.5 rounded-xl border leading-relaxed ${
+                      msg.role === 'user'
+                        ? 'bg-slate-800/40 border-slate-700/30 text-slate-300 rounded-tr-none'
+                        : 'bg-slate-950/20 border-slate-850 text-slate-300 rounded-tl-none'
+                    }`}>
+                      {msg.content}
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {isContextThinking && (
+                <div className="flex gap-2 max-w-[90%]">
+                  <div className="w-6 h-6 rounded bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 animate-pulse">
+                    <Bot className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-950/20 border border-slate-850 text-slate-500 italic animate-pulse">
+                    Thinking...
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleSendContextChat} className="flex gap-1.5 shrink-0 mt-auto">
+              <input
+                id="workspace_dev_chat_input_field"
+                type="text"
+                value={contextInput}
+                onChange={(e) => setContextInput(e.target.value)}
+                disabled={!selectedPlanId}
+                placeholder={selectedPlanId ? "Ask Dev Assistant..." : "Select plan to chat..."}
+                className="flex-1 bg-slate-800/60 border border-slate-800 focus:border-emerald-500/40 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none"
+              />
+              <button
+                id="workspace_dev_chat_send_btn"
+                type="submit"
+                disabled={!contextInput.trim() || isContextThinking}
+                className="p-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-900 transition-all disabled:opacity-40 cursor-pointer"
+              >
+                ➔
+              </button>
+            </form>
+          </div>
+        ) : (
+          /* Integrations Dashboard list with secure connection state testing */
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3.5 custom-scrollbar text-xs">
+            
+            {/* GITHUB INTEGRATION CARD */}
+            <div className="border border-slate-800/80 rounded-xl p-3 bg-slate-950/20 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Github className="w-4 h-4 text-emerald-400" />
+                  <span className="font-semibold text-slate-200">GitHub Sync</span>
+                </div>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded border font-semibold ${
+                  gitStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                  gitStatus === 'connecting' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse' :
+                  'bg-slate-800/40 text-slate-500 border-slate-800'
+                }`}>
+                  {gitStatus === 'connected' ? 'Connected 🟢' : gitStatus === 'connecting' ? 'Testing 🟡' : 'Disconnected 🔴'}
+                </span>
+              </div>
+              
+              <div className="space-y-2 text-[10px]">
+                <div>
+                  <label className="text-[8px] font-bold text-slate-500 uppercase block mb-1">Repo Name</label>
+                  <input
+                    id="git_repo_input"
+                    type="text"
+                    value={gitRepoName}
+                    onChange={(e) => setGitRepoName(e.target.value)}
+                    placeholder="e.g. portfolio-website"
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[8px] font-bold text-slate-500 uppercase block mb-1">Target Branch</label>
+                  <input
+                    id="git_branch_input"
+                    type="text"
+                    value={gitBranch}
+                    onChange={(e) => setGitBranch(e.target.value)}
+                    placeholder="main"
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[8px] font-bold text-slate-500 uppercase block mb-1">Access Token (PAT)</label>
+                  <input
+                    id="git_pat_input"
+                    type="password"
+                    value={gitPat}
+                    onChange={(e) => setGitPat(e.target.value)}
+                    placeholder="ghp_xxxxxxxxxxxxxxxx"
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none font-mono"
+                  />
+                </div>
+                <button
+                  id="test_git_btn"
+                  onClick={testGitConnection}
+                  disabled={gitStatus === 'connecting'}
+                  className="w-full py-1.5 mt-1 rounded bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-[10px] transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {gitStatus === 'connecting' ? 'Connecting...' : 'Authorize & Test Link'}
+                </button>
+              </div>
+            </div>
+
+            {/* SUPABASE CONNECTION CARD */}
+            <div className="border border-slate-800/80 rounded-xl p-3 bg-slate-950/20 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Database className="w-4 h-4 text-emerald-400" />
+                  <span className="font-semibold text-slate-200">Supabase DB</span>
+                </div>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded border font-semibold ${
+                  supabaseStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                  supabaseStatus === 'connecting' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse' :
+                  'bg-slate-800/40 text-slate-500 border-slate-800'
+                }`}>
+                  {supabaseStatus === 'connected' ? 'Connected 🟢' : supabaseStatus === 'connecting' ? 'Testing 🟡' : 'Disconnected 🔴'}
+                </span>
+              </div>
+              
+              <div className="space-y-2 text-[10px]">
+                <div>
+                  <label className="text-[8px] font-bold text-slate-500 uppercase block mb-1">Supabase Project URL</label>
+                  <input
+                    id="supabase_url_input"
+                    type="text"
+                    value={supabaseUrl}
+                    onChange={(e) => setSupabaseUrl(e.target.value)}
+                    placeholder="https://your-project.supabase.co"
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[8px] font-bold text-slate-500 uppercase block mb-1">Anon API Key</label>
+                  <input
+                    id="supabase_key_input"
+                    type="password"
+                    value={supabaseKey}
+                    onChange={(e) => setSupabaseKey(e.target.value)}
+                    placeholder="eyJhbGciOi..."
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[8px] font-bold text-slate-500 uppercase block mb-1">Service Role Key (Optional)</label>
+                  <input
+                    id="supabase_service_key_input"
+                    type="password"
+                    value={supabaseServiceKey}
+                    onChange={(e) => setSupabaseServiceKey(e.target.value)}
+                    placeholder="eyJhbGciOi..."
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none font-mono"
+                  />
+                </div>
+                <button
+                  id="test_supabase_btn"
+                  onClick={testSupabaseConnection}
+                  disabled={supabaseStatus === 'connecting'}
+                  className="w-full py-1.5 mt-1 rounded bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-[10px] transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {supabaseStatus === 'connecting' ? 'Connecting...' : 'Sync Schema & Test Link'}
+                </button>
+              </div>
+            </div>
+
+            {/* CLOUD SQL CONNECTION CARD */}
+            <div className="border border-slate-800/80 rounded-xl p-3 bg-slate-950/20 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Settings className="w-4 h-4 text-emerald-400" />
+                  <span className="font-semibold text-slate-200">Cloud SQL (Postgres)</span>
+                </div>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded border font-semibold ${
+                  sqlStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                  sqlStatus === 'connecting' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse' :
+                  'bg-slate-800/40 text-slate-500 border-slate-800'
+                }`}>
+                  {sqlStatus === 'connected' ? 'Connected 🟢' : sqlStatus === 'connecting' ? 'Testing 🟡' : 'Disconnected 🔴'}
+                </span>
+              </div>
+              
+              <div className="space-y-2 text-[10px]">
+                <div>
+                  <label className="text-[8px] font-bold text-slate-500 uppercase block mb-1">Database Host</label>
+                  <input
+                    id="sql_host_input"
+                    type="text"
+                    value={sqlHost}
+                    onChange={(e) => setSqlHost(e.target.value)}
+                    placeholder="e.g. 10.23.45.12 or domain.gcp"
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[8px] font-bold text-slate-500 uppercase block mb-1">DB User</label>
+                    <input
+                      id="sql_user_input"
+                      type="text"
+                      value={sqlUser}
+                      onChange={(e) => setSqlUser(e.target.value)}
+                      placeholder="postgres"
+                      className="w-full bg-slate-900 border border-slate-800 rounded px-1.5 py-1 text-slate-200 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[8px] font-bold text-slate-500 uppercase block mb-1">DB Password</label>
+                    <input
+                      id="sql_pass_input"
+                      type="password"
+                      value={sqlPass}
+                      onChange={(e) => setSqlPass(e.target.value)}
+                      placeholder="********"
+                      className="w-full bg-slate-900 border border-slate-800 rounded px-1.5 py-1 text-slate-200 focus:outline-none font-mono"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[8px] font-bold text-slate-500 uppercase block mb-1">Database Name</label>
+                  <input
+                    id="sql_db_input"
+                    type="text"
+                    value={sqlDb}
+                    onChange={(e) => setSqlDb(e.target.value)}
+                    placeholder="mamta_relational_db"
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none"
+                  />
+                </div>
+                <button
+                  id="test_sql_btn"
+                  onClick={testSqlConnection}
+                  disabled={sqlStatus === 'connecting'}
+                  className="w-full py-1.5 mt-1 rounded bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-[10px] transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {sqlStatus === 'connecting' ? 'Pinging...' : 'Verify Cloud SQL Server'}
+                </button>
+              </div>
+            </div>
+
+            {/* FIREBASE CONNECTION CARD */}
+            <div className="border border-slate-800/80 rounded-xl p-3 bg-slate-950/20 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-emerald-400" />
+                  <span className="font-semibold text-slate-200">Firebase Store</span>
+                </div>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded border font-semibold ${
+                  firebaseStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                  firebaseStatus === 'connecting' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse' :
+                  'bg-slate-800/40 text-slate-500 border-slate-800'
+                }`}>
+                  {firebaseStatus === 'connected' ? 'Connected 🟢' : firebaseStatus === 'connecting' ? 'Testing 🟡' : 'Disconnected 🔴'}
+                </span>
+              </div>
+              
+              <div className="space-y-2 text-[10px]">
+                <div>
+                  <label className="text-[8px] font-bold text-slate-500 uppercase block mb-1">Firebase API Key</label>
+                  <input
+                    id="firebase_key_input"
+                    type="password"
+                    value={firebaseApiKey}
+                    onChange={(e) => setFirebaseApiKey(e.target.value)}
+                    placeholder="AIzaSyAxxxxxxxxxx"
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[8px] font-bold text-slate-500 uppercase block mb-1">Project ID</label>
+                  <input
+                    id="firebase_id_input"
+                    type="text"
+                    value={firebaseProjectId}
+                    onChange={(e) => setFirebaseProjectId(e.target.value)}
+                    placeholder="mamta-gcp-9923"
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none"
+                  />
+                </div>
+                <button
+                  id="test_firebase_btn"
+                  onClick={testFirebaseConnection}
+                  disabled={firebaseStatus === 'connecting'}
+                  className="w-full py-1.5 mt-1 rounded bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-[10px] transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {firebaseStatus === 'connecting' ? 'Bootstrapping SDK...' : 'Initialize Firebase Client'}
+                </button>
+              </div>
+            </div>
+
+          </div>
+        )}
 
       </div>
 

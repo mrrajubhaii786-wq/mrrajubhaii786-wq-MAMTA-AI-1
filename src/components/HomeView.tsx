@@ -6,6 +6,7 @@ import {
   User, 
   Trash2, 
   ChevronRight, 
+  ChevronDown,
   ArrowRight,
   BookOpen,
   Plus,
@@ -30,11 +31,13 @@ import {
   Play,
   FileText,
   Image as ImageIcon,
-  Loader2
+  Loader2,
+  ThumbsUp,
+  ThumbsDown
 } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, addDoc } from 'firebase/firestore';
 import { MamtaBrainReal } from '../brain/MamtaBrainReal';
 import { AutonomousLoop } from '../brain/AutonomousLoop';
 import { motion, AnimatePresence } from 'motion/react';
@@ -248,8 +251,19 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
   const [completedStreams, setCompletedStreams] = useState<Record<string, boolean>>({});
 
   // ChatGPT Supermode states
-  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(true);
   const [autoSpeakEnabled, setAutoSpeakEnabled] = useState(false);
+  const [messageFeedback, setMessageFeedback] = useState<Record<string, 'like' | 'dislike'>>({});
+  const [feedbackModal, setFeedbackModal] = useState<{
+    isOpen: boolean;
+    messageId: string;
+    content: string;
+    type: 'like' | 'dislike';
+  } | null>(null);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+  const [isFeedbackAccordionOpen, setIsFeedbackAccordionOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<{
     name: string;
@@ -260,6 +274,7 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
   const [isUploading, setIsUploading] = useState(false);
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -626,11 +641,57 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
     }
   };
 
+  const handleFeedbackSubmit = async () => {
+    if (!feedbackModal) return;
+    setIsSubmittingFeedback(true);
+    try {
+      // Save feedback report to Firestore
+      await addDoc(collection(db, 'message_feedbacks'), {
+        sessionId: currentSessionId,
+        messageId: feedbackModal.messageId,
+        messageContent: feedbackModal.content,
+        type: feedbackModal.type,
+        userFeedbackText: feedbackText.trim(),
+        userEmail: userEmail || 'anonymous',
+        timestamp: new Date().toISOString()
+      });
+
+      // Update local feedback map so UI knows this message is rated
+      setMessageFeedback(prev => ({
+        ...prev,
+        [feedbackModal.messageId]: feedbackModal.type
+      }));
+
+      setFeedbackSuccess(true);
+      setTimeout(() => {
+        setFeedbackModal(null);
+        setFeedbackText('');
+        setFeedbackSuccess(false);
+      }, 1500);
+    } catch (err: any) {
+      console.error('Failed to submit message feedback to firestore:', err);
+      // Fallback: save locally even if firestore fails
+      setMessageFeedback(prev => ({
+        ...prev,
+        [feedbackModal.messageId]: feedbackModal.type
+      }));
+      setFeedbackSuccess(true);
+      setTimeout(() => {
+        setFeedbackModal(null);
+        setFeedbackText('');
+        setFeedbackSuccess(false);
+      }, 1500);
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
+
   // Voice Input (Speech-to-Text) using WebSpeechAPI
   const startListening = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Speech Recognition is not supported in this browser. Please try Google Chrome!");
+      setVoiceStatus("Error: Browser not supported. Use Google Chrome.");
+      setTimeout(() => setVoiceStatus(null), 5000);
       return;
     }
     
@@ -639,33 +700,58 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-IN"; // English with Indian accents / Hindi bilingual friendly
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "en-IN"; // English with Indian accents / Hindi bilingual friendly
+      recognition.continuous = false;
+      recognition.interimResults = false;
 
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
+      recognition.onstart = () => {
+        setIsListening(true);
+        setVoiceStatus("Listening... Speak now");
+      };
 
-    recognition.onerror = (event: any) => {
-      console.error("Speech recognition error", event);
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error, event);
+        setIsListening(false);
+        let errorMsg = "Error: Voice input failed";
+        if (event.error === 'not-allowed') {
+          errorMsg = "Error: Microphone permission blocked. Please check site/browser settings.";
+        } else if (event.error === 'no-speech') {
+          errorMsg = "Error: No speech detected. Try speaking closer.";
+        } else if (event.error === 'audio-capture') {
+          errorMsg = "Error: No microphone found.";
+        } else if (event.error === 'network') {
+          errorMsg = "Error: Network issue.";
+        } else if (event.error) {
+          errorMsg = `Error: ${event.error}`;
+        }
+        setVoiceStatus(errorMsg);
+        setTimeout(() => setVoiceStatus(null), 6000);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        setVoiceStatus(prev => prev && prev.startsWith("Error:") ? prev : null);
+      };
+
+      recognition.onresult = (e: any) => {
+        const text = e.results[0][0].transcript;
+        if (text) {
+          setInput(prev => prev ? prev + " " + text : text);
+          setVoiceStatus("Speech recognized!");
+          setTimeout(() => setVoiceStatus(null), 2000);
+        }
+        setIsListening(false);
+      };
+
+      recognition.start();
+    } catch (err: any) {
+      console.error("Failed to start speech recognition:", err);
       setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognition.onresult = (e: any) => {
-      const text = e.results[0][0].transcript;
-      if (text) {
-        setInput(prev => prev ? prev + " " + text : text);
-      }
-      setIsListening(false);
-    };
-
-    recognition.start();
+      setVoiceStatus(`Error: ${err.message || 'Failed to start'}`);
+      setTimeout(() => setVoiceStatus(null), 5000);
+    }
   };
 
   // Voice Output (Text-to-Speech) using Mamta Voice Clone Engine
@@ -954,9 +1040,10 @@ Technical details: \`${errorMessage}\``,
             </span>
             <button 
               onClick={() => setIsSidebarOpen(false)}
-              className="p-1 rounded-md hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition-all cursor-pointer block md:hidden"
+              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-900 hover:border-slate-800 transition-all cursor-pointer flex items-center justify-center shrink-0"
+              title="Close Sessions Sidebar"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
@@ -1233,27 +1320,110 @@ Technical details: \`${errorMessage}\``,
                 </div>
 
                 {isAI && (
-                  <div className="flex items-center gap-1.5 px-1 py-0.5 self-start animate-fade-in">
+                  <div className="flex flex-wrap items-center gap-3.5 px-1 py-0.5 self-start animate-fade-in text-slate-500">
+                    {/* Speak Button */}
                     <button
                       onClick={() => handleSpeak(msg.content, msg.id)}
-                      className={`text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded-lg transition-all hover:bg-slate-900 border border-transparent cursor-pointer ${
+                      className={`text-[10px] flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all hover:bg-slate-900 border border-transparent cursor-pointer ${
                         playingMsgId === msg.id 
                           ? 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20 font-bold' 
-                          : 'text-slate-500 hover:text-slate-300'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
+                      title={playingMsgId === msg.id ? 'Stop Voice Output' : 'Speak this response aloud'}
                     >
                       {playingMsgId === msg.id ? (
                         <>
-                          <Volume2 className="w-3 h-3 animate-pulse" />
-                          <span>Stop Audio</span>
+                          <Volume2 className="w-3.5 h-3.5 animate-pulse text-indigo-400" />
+                          <span>Stop Voice</span>
                         </>
                       ) : (
                         <>
-                          <Volume2 className="w-3 h-3" />
-                          <span>Listen (Mamta Voice)</span>
+                          <Volume2 className="w-3.5 h-3.5" />
+                          <span>Listen</span>
                         </>
                       )}
                     </button>
+
+                    {/* Auto Speak Toggle */}
+                    <button
+                      onClick={() => setAutoSpeakEnabled(!autoSpeakEnabled)}
+                      className={`text-[10px] flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all border border-transparent cursor-pointer hover:bg-slate-900 ${
+                        autoSpeakEnabled 
+                          ? 'text-emerald-400 bg-emerald-500/5 border-emerald-500/10 font-semibold' 
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                      title="Toggle auto-speak for subsequent AI responses"
+                    >
+                      {autoSpeakEnabled ? (
+                        <>
+                          <Volume2 className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                          <span>Auto-Speak: On</span>
+                        </>
+                      ) : (
+                        <>
+                          <VolumeX className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Auto-Speak: Off</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Minimal Separator */}
+                    <span className="w-px h-3 bg-slate-800" />
+
+                    {/* Like / Thumbs Up Button */}
+                    <button
+                      onClick={() => {
+                        const mId = msg.id || `${idx}`;
+                        setFeedbackModal({
+                          isOpen: true,
+                          messageId: mId,
+                          content: msg.content,
+                          type: 'like'
+                        });
+                        setFeedbackText('');
+                        setFeedbackSuccess(false);
+                        setIsFeedbackAccordionOpen(false);
+                      }}
+                      className={`p-1 rounded-lg transition-all hover:bg-slate-900 cursor-pointer ${
+                        messageFeedback[msg.id || `${idx}`] === 'like'
+                          ? 'text-emerald-400 bg-emerald-500/5 scale-105 border border-emerald-500/20'
+                          : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-900/40'
+                      }`}
+                      title="Helpful Response"
+                    >
+                      <ThumbsUp className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Dislike / Thumbs Down Button */}
+                    <button
+                      onClick={() => {
+                        const mId = msg.id || `${idx}`;
+                        setFeedbackModal({
+                          isOpen: true,
+                          messageId: mId,
+                          content: msg.content,
+                          type: 'dislike'
+                        });
+                        setFeedbackText('');
+                        setFeedbackSuccess(false);
+                        setIsFeedbackAccordionOpen(false);
+                      }}
+                      className={`p-1 rounded-lg transition-all hover:bg-slate-900 cursor-pointer ${
+                        messageFeedback[msg.id || `${idx}`] === 'dislike'
+                          ? 'text-rose-400 bg-rose-500/5 scale-105 border border-rose-500/20'
+                          : 'text-slate-400 hover:text-rose-400 hover:bg-slate-900/40'
+                      }`}
+                      title="Not Helpful Response"
+                    >
+                      <ThumbsDown className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Instant Feedback indicator with entry animation */}
+                    {messageFeedback[msg.id || `${idx}`] && (
+                      <span className="text-[9px] text-emerald-400/90 font-mono bg-emerald-500/5 px-1.5 py-0.5 rounded border border-emerald-500/10 animate-[fadeIn_0.2s_ease]">
+                        {messageFeedback[msg.id || `${idx}`] === 'like' ? 'Liked!' : 'Disliked!'} Feedback Saved!
+                      </span>
+                    )}
                   </div>
                 )}
 
@@ -1463,59 +1633,20 @@ Technical details: \`${errorMessage}\``,
                 onChange={handleFileUpload}
                 className="hidden"
               />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1 text-[11px] font-medium cursor-pointer"
-                title="Attach Files (PDF, Image, Text, JS/TS)"
-              >
-                {isUploading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-                ) : (
-                  <Paperclip className="w-3.5 h-3.5" />
-                )}
-                <span>{isUploading ? "Reading..." : "Upload File"}</span>
-              </button>
-
-              {/* Live Web Search Toggle */}
-              <button
-                type="button"
-                onClick={() => setWebSearchEnabled(!webSearchEnabled)}
-                className={`p-1.5 rounded-lg border transition-all flex items-center gap-1 text-[11px] font-medium cursor-pointer ${
-                  webSearchEnabled
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-semibold"
-                    : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
-                }`}
-                title="Toggle Live Web Search (DuckDuckGo + Wikipedia)"
-              >
-                <Search className="w-3.5 h-3.5" />
-                <span>Search Web</span>
-              </button>
-
-              {/* Auto Speak Toggle */}
-              <button
-                type="button"
-                onClick={() => setAutoSpeakEnabled(!autoSpeakEnabled)}
-                className={`p-1.5 rounded-lg border transition-all flex items-center gap-1 text-[11px] font-medium cursor-pointer ${
-                  autoSpeakEnabled
-                    ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-400 font-semibold"
-                    : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
-                }`}
-                title="Auto-speak AI responses using cloned voice synthesizer"
-              >
-                {autoSpeakEnabled ? (
-                  <Volume2 className="w-3.5 h-3.5 animate-pulse" />
-                ) : (
-                  <VolumeX className="w-3.5 h-3.5" />
-                )}
-                <span>Auto-Speak</span>
-              </button>
             </div>
 
-            <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Mamta Supermode Active</span>
+            <div className="text-[10px] font-mono flex items-center gap-1.5 transition-all">
+              {voiceStatus ? (
+                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded ${voiceStatus.startsWith('Error') ? 'bg-rose-500/15 text-rose-400 border border-rose-500/20' : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 animate-pulse'}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${voiceStatus.startsWith('Error') ? 'bg-rose-400' : 'bg-emerald-400 animate-ping'}`} />
+                  <span>{voiceStatus}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-slate-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Mamta Supermode Active</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1525,8 +1656,23 @@ Technical details: \`${errorMessage}\``,
             e.preventDefault();
             if (input.trim()) handleSendMessage(input);
           }}
-          className="relative max-w-3xl mx-auto"
+          className="relative max-w-3xl mx-auto flex items-center"
         >
+          {/* File Upload Trigger Plus Button */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="absolute left-2 p-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-emerald-400 transition-all cursor-pointer flex items-center justify-center border border-slate-800/60 shadow-lg group"
+            title="Upload/Attach files (PDF, Image, Text, JS/TS)"
+          >
+            {isUploading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+            ) : (
+              <Plus className="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-90 text-slate-300 group-hover:text-emerald-400" />
+            )}
+          </button>
+
           <input
             id="home_chat_input_field"
             type="text"
@@ -1535,9 +1681,9 @@ Technical details: \`${errorMessage}\``,
             placeholder={
               isListening 
                 ? "Listening... Speak now!" 
-                : "Ask me anything... (e.g., 'What is React Hooks?' or upload files)"
+                : "Ask MAMTA..."
             }
-            className={`w-full bg-slate-900/70 border rounded-2xl pl-4 pr-24 py-3.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 shadow-2xl transition-all duration-300 ${
+            className={`w-full bg-slate-900/70 border rounded-2xl pl-12 pr-24 py-3.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 shadow-2xl transition-all duration-300 ${
               isListening ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/10" : "border-slate-900 hover:border-slate-800 focus:border-emerald-500/50"
             }`}
           />
@@ -1570,9 +1716,7 @@ Technical details: \`${errorMessage}\``,
             </button>
           </div>
         </form>
-        <p className="text-[9px] text-slate-600 text-center mt-2 font-mono">
-          MAMTA AI can generate plans, run code sandbox, perform automated web search and voice synthesis.
-        </p>
+        
       </div>
 
     </div>
@@ -1800,6 +1944,134 @@ Technical details: \`${errorMessage}\``,
                 </div>
               </div>
 
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 4. MAMTA AI Message Feedback Modal */}
+      <AnimatePresence>
+        {feedbackModal && feedbackModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop filter blur */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isSubmittingFeedback && setFeedbackModal(null)}
+              className="absolute inset-0 bg-slate-950/85 backdrop-blur-md"
+            />
+
+            <motion.div 
+              initial={{ scale: 0.95, y: 15, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 15, opacity: 0 }}
+              className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg overflow-hidden relative z-10 shadow-2xl flex flex-col text-slate-100 font-sans"
+            >
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900">
+                <span className="text-base font-medium text-slate-100">Submit feedback</span>
+                <button 
+                  type="button"
+                  disabled={isSubmittingFeedback}
+                  onClick={() => setFeedbackModal(null)}
+                  className="p-1.5 rounded-lg hover:bg-slate-850 text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto custom-scrollbar">
+                
+                {feedbackSuccess ? (
+                  <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 animate-bounce">
+                      <Check className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-sm font-semibold text-emerald-400">Feedback Submitted Successfully!</h4>
+                    <p className="text-xs text-slate-400 font-mono">Thank you for helping us improve MAMTA AI response quality.</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                      Submitting this feedback report will send the following information to MAMTA AI:
+                    </p>
+
+                    <ul className="list-disc pl-5 space-y-1.5 text-xs text-slate-400">
+                      <li>The entire contents of all of the files of your app</li>
+                      <li>The entire contents of earlier versions of the files of your app if they changed in this session</li>
+                      <li>The entire contents of your chat history with MAMTA AI</li>
+                    </ul>
+
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Your response is Feedback under the <span className="text-indigo-400 hover:underline cursor-pointer">Terms</span>, and may be used to improve our services subject to our <span className="text-indigo-400 hover:underline cursor-pointer">Privacy Policy</span>. Do not submit personal, sensitive, or confidential information.
+                    </p>
+
+                    {/* Accordion list */}
+                    <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-950/30">
+                      <button
+                        type="button"
+                        onClick={() => setIsFeedbackAccordionOpen(!isFeedbackAccordionOpen)}
+                        className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs font-medium text-slate-300 hover:bg-slate-900/50 transition-all cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Bot className="w-4 h-4 text-emerald-400" />
+                          MAMTA AI messages
+                        </span>
+                        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${isFeedbackAccordionOpen ? 'rotate-185' : ''}`} />
+                      </button>
+
+                      {isFeedbackAccordionOpen && (
+                        <div className="px-3.5 pb-3 pt-1.5 border-t border-slate-800 text-[11px] text-slate-400 leading-relaxed max-h-36 overflow-y-auto custom-scrollbar font-mono bg-slate-950/50">
+                          {feedbackModal.content}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Feedback Textarea Input */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-slate-300">
+                        {feedbackModal.type === 'like' ? 'What did you like about the response?' : 'What did you dislike about the response?'}
+                      </label>
+                      <textarea
+                        value={feedbackText}
+                        onChange={(e) => setFeedbackText(e.target.value)}
+                        placeholder="Please write your observations or details..."
+                        className="w-full h-24 p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-200 placeholder:text-slate-600 outline-none focus:ring-1 focus:ring-emerald-500/30 focus:border-emerald-500/50 resize-none transition-all"
+                      />
+                    </div>
+
+                    {/* Footer Actions */}
+                    <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-800/60">
+                      <button
+                        type="button"
+                        onClick={() => setFeedbackModal(null)}
+                        disabled={isSubmittingFeedback}
+                        className="px-4 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800/80 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleFeedbackSubmit}
+                        disabled={isSubmittingFeedback}
+                        className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-slate-950 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-lg shadow-emerald-500/5 font-mono"
+                      >
+                        {isSubmittingFeedback ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Sending...</span>
+                          </>
+                        ) : (
+                          <span>Send</span>
+                        )}
+                      </button>
+                    </div>
+                  </>
+                )}
+
+              </div>
             </motion.div>
           </div>
         )}

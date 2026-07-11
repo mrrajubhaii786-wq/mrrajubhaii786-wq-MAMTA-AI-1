@@ -11,7 +11,9 @@ import {
   Terminal,
   Clock,
   Sparkles,
-  Rocket
+  Rocket,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -28,6 +30,15 @@ export default function App() {
   const [sessionId, setSessionId] = useState('');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('desktop_sidebar_open');
+    return saved !== 'false';
+  });
+
+  const handleToggleSidebar = (val: boolean) => {
+    setDesktopSidebarOpen(val);
+    localStorage.setItem('desktop_sidebar_open', String(val));
+  };
 
   useEffect(() => {
     // Generate or fetch a stable sessionId
@@ -50,115 +61,126 @@ export default function App() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(16,185,129,0.06),transparent_40%),radial-gradient(ellipse_at_bottom_left,rgba(6,182,212,0.04),transparent_35%)] pointer-events-none" />
 
       {/* 1. LEFT NAVIGATION SIDEBAR (Desktop) */}
-      <aside className="hidden lg:flex flex-col w-56 shrink-0 bg-slate-900/50 border-r border-slate-900 p-4 backdrop-blur-xl relative z-10">
-        
-        {/* Glowing Logo Block */}
-        <div className="flex items-center gap-3 pb-4 border-b border-slate-900">
-          <div className="relative shrink-0">
-            <svg viewBox="0 0 100 100" className="w-8 h-8 animate-[spin_12s_linear_infinite]">
-              <defs>
-                <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#10b981" />
-                  <stop offset="100%" stopColor="#06b6d4" />
-                </linearGradient>
-              </defs>
-              <circle cx="50" cy="50" r="40" fill="none" stroke="url(#logo-grad)" strokeWidth="8" strokeDasharray="180 60" />
-              <path d="M50 25 L65 50 L50 75 L35 50 Z" fill="url(#logo-grad)" />
-            </svg>
-            <div className="absolute inset-0 bg-emerald-500/20 blur-md rounded-full -z-10" />
-          </div>
-          <div>
-            <h1 className="text-xs font-bold tracking-tight text-slate-100 font-display flex items-center gap-1 uppercase">
-              MAMTA AI
-              <span className="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1 rounded-md lowercase normal-case tracking-normal">v16.0 SaaS</span>
-            </h1>
-            <p className="text-[9px] text-slate-500 font-mono tracking-wider font-semibold">AUTONOMOUS CORE</p>
-          </div>
-        </div>
-
-        {/* Navigation core buttons */}
-        <nav className="flex-1 py-4 space-y-1.5">
+      {desktopSidebarOpen ? (
+        <aside className="hidden lg:flex flex-col w-56 shrink-0 bg-slate-900/50 border-r border-slate-900 p-4 backdrop-blur-xl relative z-10 animate-fade-in">
           
-          <button
-            id="nav_link_home"
-            onClick={() => { setActiveTab('home'); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-              activeTab === 'home' 
-                ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-400 border border-emerald-500/15 shadow-inner' 
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
-            }`}
-          >
-            <Home className="w-3.5 h-3.5 shrink-0" />
-            <span>Home Chat</span>
-          </button>
+          {/* Glowing Logo Block with Collapse Trigger */}
+          <div className="flex items-center justify-between pb-4 border-b border-slate-900">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="relative shrink-0">
+                <svg viewBox="0 0 100 100" className="w-8 h-8 animate-[spin_12s_linear_infinite]">
+                  <defs>
+                    <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#10b981" />
+                      <stop offset="100%" stopColor="#06b6d4" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="url(#logo-grad)" strokeWidth="8" strokeDasharray="180 60" />
+                  <path d="M50 25 L65 50 L50 75 L35 50 Z" fill="url(#logo-grad)" />
+                </svg>
+                <div className="absolute inset-0 bg-emerald-500/20 blur-md rounded-full -z-10" />
+              </div>
+              <div className="truncate">
+                <h1 className="text-xs font-bold tracking-tight text-slate-100 font-display flex items-center gap-1 uppercase truncate">
+                  MAMTA AI
+                </h1>
+                <p className="text-[8px] text-slate-500 font-mono tracking-wider font-semibold truncate">AUTONOMOUS CORE</p>
+              </div>
+            </div>
 
-          <button
-            id="nav_link_workspace"
-            onClick={() => { setActiveTab('workspace'); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-              activeTab === 'workspace' 
-                ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-400 border border-emerald-500/15 shadow-inner' 
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
-            }`}
-          >
-            <Briefcase className="w-3.5 h-3.5 shrink-0" />
-            <span>Workspace IDE</span>
-          </button>
-
-          <button
-            id="nav_link_launch"
-            onClick={() => { setActiveTab('launch'); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-              activeTab === 'launch' 
-                ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-400 border border-emerald-500/15 shadow-inner' 
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
-            }`}
-          >
-            <Rocket className="w-3.5 h-3.5 shrink-0" />
-            <span>SaaS Launch Hub</span>
-          </button>
-
-          <button
-            id="nav_link_admin"
-            onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-              activeTab === 'admin' 
-                ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-400 border border-emerald-500/15 shadow-inner' 
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
-            }`}
-          >
-            <Cpu className="w-3.5 h-3.5 shrink-0" />
-            <span>Admin Dashboard</span>
-          </button>
-
-          <button
-            id="nav_link_safedrop"
-            onClick={() => { setActiveTab('safedrop'); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-              activeTab === 'safedrop' 
-                ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-400 border border-emerald-500/15 shadow-inner' 
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5 shrink-0" />
-            <span>SafeDrop Vault</span>
-          </button>
-
-        </nav>
-
-        {/* Sidebar Footer details */}
-        <div className="border-t border-slate-900 pt-3 text-[9px] text-slate-600 font-mono space-y-1">
-          <div className="flex items-center justify-between">
-            <span>Server Mode:</span>
-            <span className="text-emerald-400 font-bold uppercase">Online</span>
+            <button
+              onClick={() => handleToggleSidebar(false)}
+              className="p-1.5 rounded-lg bg-slate-950/40 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-900/60 hover:border-slate-800 transition-all cursor-pointer flex items-center justify-center shrink-0"
+              title="Close Sidebar"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <div className="flex items-center justify-between">
-            <span>Bilingual Core:</span>
-            <span className="text-slate-400">English/Hindi</span>
-          </div>
-        </div>
 
-      </aside>
+          {/* Navigation core buttons */}
+          <nav className="flex-1 py-4 space-y-1.5">
+            
+            <button
+              id="nav_link_home"
+              onClick={() => { setActiveTab('home'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'home' 
+                  ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-400 border border-emerald-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Home className="w-3.5 h-3.5 shrink-0" />
+              <span>Home Chat</span>
+            </button>
+
+            <button
+              id="nav_link_workspace"
+              onClick={() => { setActiveTab('workspace'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'workspace' 
+                  ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-400 border border-emerald-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Briefcase className="w-3.5 h-3.5 shrink-0" />
+              <span>Workspace IDE</span>
+            </button>
+
+            <button
+              id="nav_link_launch"
+              onClick={() => { setActiveTab('launch'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'launch' 
+                  ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-400 border border-emerald-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Rocket className="w-3.5 h-3.5 shrink-0" />
+              <span>SaaS Launch Hub</span>
+            </button>
+
+            <button
+              id="nav_link_admin"
+              onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'admin' 
+                  ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-400 border border-emerald-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5 shrink-0" />
+              <span>Admin Dashboard</span>
+            </button>
+
+            <button
+              id="nav_link_safedrop"
+              onClick={() => { setActiveTab('safedrop'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'safedrop' 
+                  ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-400 border border-emerald-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5 shrink-0" />
+              <span>SafeDrop Vault</span>
+            </button>
+
+          </nav>
+
+          {/* Sidebar Footer details */}
+          <div className="border-t border-slate-900 pt-3 text-[9px] text-slate-600 font-mono space-y-1">
+            <div className="flex items-center justify-between">
+              <span>Server Mode:</span>
+              <span className="text-emerald-400 font-bold uppercase">Online</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Bilingual Core:</span>
+              <span className="text-slate-400">English/Hindi</span>
+            </div>
+          </div>
+
+        </aside>
+      ) : null}
 
       {/* MOBILE HEADER (Lg screen hidden) */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-slate-950/80 border-b border-slate-900 backdrop-blur-md z-30 flex items-center justify-between px-4">
@@ -250,6 +272,43 @@ export default function App() {
 
       {/* 2. CORE VIEW CONTENT WRAPPER */}
       <main className="flex-1 flex flex-col p-2.5 lg:p-3.5 pt-16 lg:pt-3.5 overflow-hidden relative z-10">
+        
+        {/* Desktop Top Header Bar (Only visible when sidebar is closed) */}
+        {!desktopSidebarOpen && (
+          <div className="hidden lg:flex items-center justify-between h-12 shrink-0 bg-slate-900/40 border border-slate-800/80 px-4 rounded-xl backdrop-blur-md mb-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => handleToggleSidebar(true)}
+                className="p-1.5 rounded-lg bg-slate-950/60 hover:bg-slate-800 text-slate-300 hover:text-emerald-400 border border-slate-800 transition-all cursor-pointer flex items-center gap-2 group text-xs font-semibold"
+                title="Open Navigation Menu"
+              >
+                <Menu className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" />
+                <span>Open Menu</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <div className="relative shrink-0">
+                  <svg viewBox="0 0 100 100" className="w-5 h-5 animate-[spin_12s_linear_infinite]">
+                    <defs>
+                      <linearGradient id="logo-grad-mini" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#10b981" />
+                        <stop offset="100%" stopColor="#06b6d4" />
+                      </linearGradient>
+                    </defs>
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="url(#logo-grad-mini)" strokeWidth="8" strokeDasharray="180 60" />
+                    <path d="M50 25 L65 50 L50 75 L35 50 Z" fill="url(#logo-grad-mini)" />
+                  </svg>
+                </div>
+                <span className="text-xs font-bold tracking-wider font-display text-slate-100 uppercase">MAMTA AI</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 text-[10px] text-slate-500 font-mono">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Core Operational</span>
+            </div>
+          </div>
+        )}
         
         <ErrorBoundary>
           <AnimatePresence mode="wait">

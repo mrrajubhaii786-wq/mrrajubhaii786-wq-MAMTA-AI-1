@@ -36,8 +36,10 @@ import AdminView from './components/AdminView';
 import SafeDropView from './components/SafeDropView';
 import LaunchHubView from './components/LaunchHubView';
 import ErrorBoundary from './components/ErrorBoundary';
+import { MamtaBrainReal } from './brain/MamtaBrainReal';
 
 export default function App() {
+  const [brain] = useState(() => new MamtaBrainReal());
   const [activeTab, setActiveTab] = useState<'home' | 'workspace' | 'admin' | 'safedrop' | 'launch'>('home');
   const [sessionId, setSessionId] = useState('');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -464,6 +466,7 @@ export default function App() {
                   showUpgradeModal={showUpgradeModal}
                   setShowUpgradeModal={setShowUpgradeModal}
                   fetchSubscriptionMetrics={fetchSubscriptionMetrics}
+                  brain={brain}
                 />
               )}
               {activeTab === 'workspace' && (
@@ -471,6 +474,7 @@ export default function App() {
                   sessionId={sessionId} 
                   selectedPlanId={selectedPlanId}
                   onSelectPlan={handleSelectPlan}
+                  brain={brain}
                 />
               )}
               {activeTab === 'admin' && (

@@ -1,12 +1,15 @@
+import { decide, AutonomousState } from "./DecisionEngine";
+
 export class AutonomousLoop {
   private brain: any;
   private running: boolean = false;
-  private intervalId: any = null;
+  private paused: boolean = false;
   private subscribers: ((status: string) => void)[] = [];
 
-  constructor(brain: any) {
+  constructor(brain?: any) {
     this.brain = brain;
     this.running = false;
+    this.paused = false;
   }
 
   public subscribe(callback: (status: string) => void) {
@@ -27,30 +30,121 @@ export class AutonomousLoop {
     });
   }
 
-  public start() {
-    if (this.running) return;
-    this.running = true;
-    this.notify("Autonomous Loop Active");
-    this.loop();
+  public pause() {
+    if (this.running && !this.paused) {
+      this.paused = true;
+      this.notify("⏸ Autonomous Loop Paused.");
+    }
   }
 
-  private async loop() {
-    while (this.running) {
-      console.log("🤖 AUTO THINKING...");
-      this.notify("Autonomous: Thinking next goals...");
-      try {
-        const response = await this.brain.autoThink();
-        this.notify(`Completed: ${response.substring(0, 50)}...`);
-      } catch (e) {
-        this.notify("Autonomous: Idle / Standby");
-      }
-      await new Promise(resolve => setTimeout(resolve, 5000));
+  public resume() {
+    if (this.running && this.paused) {
+      this.paused = false;
+      this.notify("▶ Autonomous Loop Resumed.");
     }
+  }
+
+  public isPaused(): boolean {
+    return this.paused;
+  }
+
+  public async retry(customBrain?: any) {
+    this.notify("🔁 Restarting Autonomous Loop (Retry)...");
+    this.stop();
+    this.paused = false;
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return this.start(customBrain);
+  }
+
+  public async start(customBrain?: any) {
+    if (this.running) return;
+    this.running = true;
+    this.notify("🤖 Autonomous Core Activated: Running Real Self-Correction Loop...");
+    
+    const activeBrain = customBrain || this.brain;
+    if (!activeBrain) {
+      this.notify("❌ Error: No brain connected to the loop.");
+      this.running = false;
+      return;
+    }
+
+    let state: AutonomousState = {
+      built: false,
+      deployed: false,
+      error: null
+    };
+
+    let step = 1;
+    const maxSteps = 15;
+
+    while (this.running && step <= maxSteps) {
+      if (this.paused) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        continue;
+      }
+      this.notify(`⚡ [Loop Cycle ${step}/${maxSteps}] Assessing state...`);
+      console.log("⚡ LOOP CYCLE:", step);
+
+      const decision = activeBrain.decide(state);
+      this.notify(`🧠 AI Decision: "${decision.toUpperCase()}"`);
+
+      if (decision === "build") {
+        this.notify("🔨 Building system: Running production compilers ('npm run build')...");
+        const res = await activeBrain.build();
+        if (res.success) {
+          state.built = true;
+          state.error = null;
+          this.notify("✅ Build successful! No errors encountered.");
+        } else {
+          state.built = false;
+          state.error = res.error || "Build compiling mismatch";
+          this.notify(`❌ Build failed: ${state.error}`);
+        }
+      }
+
+      if (decision === "fix") {
+        this.notify(`🛠 Self-Healing Mode: Repairing captured failure: "${state.error}"`);
+        const res = await activeBrain.fix(state.error);
+        if (res.success) {
+          state.error = null;
+          this.notify("✅ Self-healing recovery command executed successfully!");
+        } else {
+          state.error = res.error || "Auto-fix failed";
+          this.notify(`❌ Self-healing failed to repair: ${state.error}`);
+        }
+      }
+
+      if (decision === "deploy") {
+        this.notify("🚀 Deploying compiled build: Transferring assets to host platform...");
+        const res = await activeBrain.deploy();
+        if (res.success) {
+          state.deployed = true;
+          this.notify(`🎉 DEPLOYMENT COMPLETE! Site fully online!`);
+        } else {
+          state.deployed = false;
+          state.error = res.error || "Deployment pipeline error";
+          this.notify(`❌ Deployment failed: ${state.error}`);
+        }
+      }
+
+      if (decision === "done" || state.deployed) {
+        this.notify("🌟 MISSION COMPLETED: System is healthy and deployed!");
+        break;
+      }
+
+      step++;
+      // Wait 3 seconds between cycles to let subscribers read and make it visual
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+
+    this.running = false;
+    this.notify("⏹ Autonomous Loop process terminated.");
+    return state;
   }
 
   public stop() {
     this.running = false;
-    this.notify("Autonomous Loop Stopped");
+    this.notify("⏹ Autonomous Loop Stopped.");
   }
 
   public isRunning(): boolean {

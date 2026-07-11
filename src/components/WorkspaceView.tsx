@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Play, 
+  Pause,
+  Square,
   Code, 
   Terminal, 
   Github, 
@@ -29,14 +31,18 @@ import {
   Link
 } from 'lucide-react';
 import { MasterPlan, ProjectTask } from '../types';
+import { MamtaBrainReal } from '../brain/MamtaBrainReal';
+import * as diff from 'diff';
+import { AutonomousLoop } from '../brain/AutonomousLoop';
 
 interface WorkspaceViewProps {
   sessionId: string;
   selectedPlanId: string | null;
   onSelectPlan: (planId: string) => void;
+  brain: MamtaBrainReal;
 }
 
-export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan }: WorkspaceViewProps) {
+export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan, brain }: WorkspaceViewProps) {
   // DB & State lists
   const [plans, setPlans] = useState<MasterPlan[]>([]);
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
@@ -44,6 +50,15 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+
+  // Diff, original content, and autonomous loop states
+  const [showDiffView, setShowDiffView] = useState(false);
+  const [originalContent, setOriginalContent] = useState('');
+  const [autoLoop] = useState(() => new AutonomousLoop(brain));
+  const [loopStatus, setLoopStatus] = useState('idle');
+  const [isLoopRunning, setIsLoopRunning] = useState(false);
+  const [isLoopPaused, setIsLoopPaused] = useState(false);
+  const [thinkingSteps, setThinkingSteps] = useState<string[]>([]);
 
   // Loading/Running actions states
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -166,6 +181,12 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan 
 
   useEffect(() => {
     fetchPlans();
+    const pending = localStorage.getItem('mamta_pending_dev_prompt');
+    if (pending) {
+      addLog(`⚡ [MAMTA AI] Seamless workspace redirect success.`);
+      addLog(`⚡ [MAMTA AI] Initializing Workspace context for build query: "${pending}"`);
+      localStorage.removeItem('mamta_pending_dev_prompt');
+    }
   }, []);
 
   useEffect(() => {
@@ -173,6 +194,36 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan 
       fetchPlanDetails();
     }
   }, [selectedPlanId]);
+
+  useEffect(() => {
+    const unsubscribe = brain.subscribeToPipeline((event) => {
+      if (event && event.details) {
+        setConsoleLogs(prev => {
+          const detail = `🧠 [Brain] Step: ${event.step.toUpperCase()} - ${event.details}`;
+          if (prev[prev.length - 1] === detail) return prev; // avoid exact consecutive duplicates
+          return [...prev, detail];
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, [brain]);
+
+  useEffect(() => {
+    const handleStatus = (status: string) => {
+      setLoopStatus(status);
+      addLog(status);
+    };
+    autoLoop.subscribe(handleStatus);
+    return () => autoLoop.unsubscribe(handleStatus);
+  }, [autoLoop]);
+
+  useEffect(() => {
+    const unsubscribeThinking = brain.thinking.subscribe((step) => {
+      setThinkingSteps(prev => [...prev, step]);
+      addLog(`🧠 [ThinkingStream] ${step}`);
+    });
+    return () => unsubscribeThinking();
+  }, [brain]);
 
   useEffect(() => {
     if (terminalContainerRef.current) {
@@ -307,6 +358,8 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan 
       const data = await res.json();
       setSelectedFile(fileName);
       setFileContent(data.content);
+      setOriginalContent(data.content || '');
+      setShowDiffView(false);
       setIsEditing(false);
       addLog(`[SYSTEM] Loaded file buffer: ${fileName}`);
     } catch (err: any) {
@@ -330,6 +383,7 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan 
       if (data.error) throw new Error(data.error);
 
       setIsEditing(false);
+      setOriginalContent(fileContent);
       addLog(`[SYSTEM] Manually committed custom edits to disk: ${selectedFile}`);
       setPreviewKey(prev => prev + 1);
     } catch (err: any) {
@@ -604,26 +658,106 @@ User Query: "${userText}"`;
               )}
             </div>
 
-            {/* Quick Action Executor Bar */}
+            {/* Quick Action & Autonomous Control Panel */}
             {tasks.length > 0 && (
-              <div className="mt-3 pt-2.5 border-t border-slate-800 shrink-0">
+              <div className="mt-3 pt-2.5 border-t border-slate-800 shrink-0 space-y-2.5">
+                <div className="text-[10px] uppercase font-bold text-slate-400 font-mono tracking-wider flex items-center justify-between">
+                  <span>🤖 Autonomous Control Panel (Devin Mode)</span>
+                  <span className={`h-2 w-2 rounded-full ${isLoopRunning ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`} />
+                </div>
+
+                {/* Control Button Swarm */}
+                <div className="grid grid-cols-4 gap-1.5">
+                  <button
+                    onClick={async () => {
+                      setIsLoopRunning(true);
+                      setIsLoopPaused(false);
+                      addLog("▶ [Control Panel] Starting Autonomous Core V2...");
+                      await autoLoop.start();
+                      setIsLoopRunning(false);
+                    }}
+                    disabled={isLoopRunning}
+                    className={`py-2 rounded-lg text-[10px] font-bold flex flex-col items-center justify-center gap-1 transition-all border ${
+                      isLoopRunning 
+                        ? 'bg-slate-850 border-slate-800 text-slate-500 cursor-not-allowed' 
+                        : 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400 cursor-pointer shadow'
+                    }`}
+                    title="Start Autonomous Loop"
+                  >
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>Start</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (isLoopPaused) {
+                        autoLoop.resume();
+                        setIsLoopPaused(false);
+                        addLog("▶ [Control Panel] Resumed loop.");
+                      } else {
+                        autoLoop.pause();
+                        setIsLoopPaused(true);
+                        addLog("⏸ [Control Panel] Paused loop.");
+                      }
+                    }}
+                    disabled={!isLoopRunning}
+                    className={`py-2 rounded-lg text-[10px] font-bold flex flex-col items-center justify-center gap-1 transition-all border ${
+                      !isLoopRunning
+                        ? 'bg-slate-850 border-slate-800 text-slate-500 cursor-not-allowed'
+                        : isLoopPaused
+                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 cursor-pointer animate-pulse'
+                        : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-400 cursor-pointer shadow'
+                    }`}
+                    title="Pause / Resume Loop"
+                  >
+                    {isLoopPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                    <span>{isLoopPaused ? "Resume" : "Pause"}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      autoLoop.stop();
+                      setIsLoopRunning(false);
+                      setIsLoopPaused(false);
+                      addLog("⛔ [Control Panel] Stopped loop manually.");
+                    }}
+                    disabled={!isLoopRunning}
+                    className={`py-2 rounded-lg text-[10px] font-bold flex flex-col items-center justify-center gap-1 transition-all border ${
+                      !isLoopRunning
+                        ? 'bg-slate-850 border-slate-800 text-slate-500 cursor-not-allowed'
+                        : 'bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400 cursor-pointer shadow'
+                    }`}
+                    title="Stop Autonomous Loop"
+                  >
+                    <Square className="w-3 h-3 fill-current" />
+                    <span>Stop</span>
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      setIsLoopRunning(true);
+                      setIsLoopPaused(false);
+                      addLog("🔁 [Control Panel] Retrying Autonomous Loop execution...");
+                      await autoLoop.retry();
+                      setIsLoopRunning(false);
+                    }}
+                    className="py-2 rounded-lg text-[10px] font-bold flex flex-col items-center justify-center gap-1 transition-all border bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/30 text-indigo-400 cursor-pointer shadow"
+                    title="Retry Autonomous Loop"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Retry</span>
+                  </button>
+                </div>
+
+                {/* Existing Manual Build button for convenience */}
                 <button
                   id="execute_compilation_build_btn"
                   onClick={handleBuildSequential}
-                  disabled={isBuilding}
-                  className="w-full py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-900 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/10 cursor-pointer disabled:opacity-50"
+                  disabled={isBuilding || isLoopRunning}
+                  className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-[10px] flex items-center justify-center gap-1 transition-all cursor-pointer disabled:opacity-40"
                 >
-                  {isBuilding ? (
-                     <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Compiling Tasks...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-3.5 h-3.5 fill-slate-900" />
-                      <span>Build Project Codes</span>
-                    </>
-                  )}
+                  <Play className="w-3 h-3 fill-slate-200" />
+                  <span>Or Run Manual Tasks Build Sequence</span>
                 </button>
               </div>
             )}
@@ -792,46 +926,117 @@ User Query: "${userText}"`;
             </div>
 
             {/* Core Code Editor Block */}
-            <div className="md:col-span-9 flex flex-col h-full">
+            <div className="md:col-span-9 flex flex-col h-full bg-slate-950/20">
               {/* Editor Action Headers */}
-              <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5 shrink-0 bg-slate-950/15">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs text-slate-200 font-medium font-mono">
-                    {selectedFile ? selectedFile : 'Scratchpad buffer'}
-                  </span>
-                  {isEditing && (
-                    <span className="text-[9px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/20 font-semibold animate-pulse">Unsaved Edits</span>
+              <div className="flex flex-col border-b border-slate-800 shrink-0 bg-slate-950/10">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800/50">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs text-slate-200 font-medium font-mono">
+                      {selectedFile ? selectedFile : 'Scratchpad buffer'}
+                    </span>
+                    {isEditing && (
+                      <span className="text-[9px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/20 font-semibold animate-pulse">Unsaved Edits</span>
+                    )}
+                  </div>
+
+                  {selectedFile && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        id="save_file_modifications_btn"
+                        onClick={handleSaveFile}
+                        className="py-1 px-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold rounded text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow"
+                      >
+                        <Save className="w-3 h-3" />
+                        <span>Save Changes</span>
+                      </button>
+                    </div>
                   )}
                 </div>
 
-                {selectedFile && (
-                  <div className="flex items-center gap-2">
+                {/* Tab Navigation: Code vs Diff */}
+                <div className="flex items-center justify-between px-3 bg-slate-900/40">
+                  <div className="flex">
                     <button
-                      id="save_file_modifications_btn"
-                      onClick={handleSaveFile}
-                      className="py-1 px-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold rounded text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow"
+                      onClick={() => setShowDiffView(false)}
+                      className={`py-2 px-4 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                        !showDiffView 
+                          ? 'border-emerald-500 text-emerald-400 bg-slate-950/10' 
+                          : 'border-transparent text-slate-400 hover:text-slate-200'
+                      }`}
                     >
-                      <Save className="w-3 h-3" />
-                      <span>Save Changes</span>
+                      📝 Code Editor
+                    </button>
+                    <button
+                      onClick={() => setShowDiffView(true)}
+                      className={`py-2 px-4 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+                        showDiffView 
+                          ? 'border-indigo-500 text-indigo-400 bg-slate-950/10' 
+                          : 'border-transparent text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      ⚔️ AI Diff View
                     </button>
                   </div>
-                )}
+
+                  {selectedFile && !showDiffView && (
+                    <button
+                      onClick={() => {
+                        addLog("⚡ [Devin Mode] Simulating real cursor key typing inputs...");
+                        let currentIdx = 0;
+                        const full = fileContent;
+                        setFileContent("");
+                        const speed = 25; // characters per step
+                        const timer = setInterval(() => {
+                          currentIdx += speed;
+                          setFileContent(full.substring(0, currentIdx));
+                          if (currentIdx >= full.length) {
+                            clearInterval(timer);
+                            setFileContent(full);
+                            addLog("✅ [Devin Mode] Cursor typing simulation finished.");
+                          }
+                        }, 8);
+                      }}
+                      className="py-1 px-2.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 hover:text-indigo-300 font-bold rounded text-[10px] border border-indigo-500/20 flex items-center gap-1 transition-all cursor-pointer mr-1"
+                      title="Simulate Real Cursor Input Typing"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Devin Auto-Type</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Dynamic textarea compiler */}
-              <div className="flex-1 bg-slate-950/40 p-2.5 font-mono text-xs overflow-hidden">
-                <textarea
-                  id="workspace_file_editor_area"
-                  value={fileContent}
-                  onChange={(e) => {
-                    setFileContent(e.target.value);
-                    setIsEditing(true);
-                  }}
-                  disabled={!selectedFile}
-                  placeholder="// Active source files compiled by your Builder tasks will view or edit here. Choose any file from the explorer on the left or hit 'Build' to generate file assets."
-                  className="w-full h-full bg-transparent text-slate-300 resize-none focus:outline-none placeholder-slate-600 leading-relaxed custom-scrollbar selection:bg-emerald-500/20 selection:text-emerald-300"
-                />
+              {/* Dynamic textarea compiler or Diff View */}
+              <div className="flex-1 bg-slate-950/40 font-mono text-xs overflow-hidden flex flex-col">
+                {showDiffView ? (
+                  <div className="flex-1 overflow-auto bg-slate-950 p-4 font-mono text-xs custom-scrollbar">
+                    {diff.diffLines(originalContent || '', fileContent || '').map((part, index) => {
+                      const color = part.added 
+                        ? 'bg-emerald-500/10 text-emerald-400 border-l-2 border-emerald-500/50 pl-2' 
+                        : part.removed 
+                        ? 'bg-rose-500/10 text-rose-400 border-l-2 border-rose-500/50 line-through pl-2' 
+                        : 'text-slate-400 pl-2';
+                      return (
+                        <pre key={index} className={`${color} whitespace-pre-wrap leading-relaxed py-0.5 font-mono`}>
+                          {part.value}
+                        </pre>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <textarea
+                    id="workspace_file_editor_area"
+                    value={fileContent}
+                    onChange={(e) => {
+                      setFileContent(e.target.value);
+                      setIsEditing(true);
+                    }}
+                    disabled={!selectedFile}
+                    placeholder="// Active source files compiled by your Builder tasks will view or edit here. Choose any file from the explorer on the left or hit 'Build' to generate file assets."
+                    className="w-full h-full bg-transparent text-slate-300 resize-none focus:outline-none placeholder-slate-600 leading-relaxed custom-scrollbar selection:bg-emerald-500/20 selection:text-emerald-300 p-4"
+                  />
+                )}
               </div>
 
               {/* Custom Git Sync button panel */}
@@ -928,8 +1133,12 @@ User Query: "${userText}"`;
                     ? 'text-rose-400' 
                     : log.includes('[SUCCESS]') 
                     ? 'text-emerald-400 font-semibold' 
+                    : log.includes('[Brain]')
+                    ? 'text-indigo-400 font-semibold'
+                    : log.includes('[AutoLoop]')
+                    ? 'text-cyan-400 font-medium'
                     : log.includes('[AI]')
-                    ? 'text-cyan-400'
+                    ? 'text-cyan-300'
                     : log.includes('[INFO]')
                     ? 'text-amber-400'
                     : log.includes('[INTEGRATION]')

@@ -53,6 +53,17 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "keyName", "encryptedValue", "itemType", "createdAt"]
+    },
+    "Memory": {
+      "title": "Memory",
+      "description": "Cloud memory records of Mamta AI learning",
+      "type": "object",
+      "properties": {
+        "input": { "type": "string" },
+        "output": { "type": "string" },
+        "time": { "type": "integer" }
+      },
+      "required": ["input", "output", "time"]
     }
   },
   "firestore": {
@@ -71,6 +82,10 @@
     "/vault/{vaultId}": {
       "schema": "VaultItem",
       "description": "Collection of encrypted credentials"
+    },
+    "/memory/{memoryId}": {
+      "schema": "Memory",
+      "description": "Collection of learning memory records"
     }
   }
 }

@@ -40,6 +40,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, addDoc } from 'firebase/firestore';
 import { MamtaBrainReal, isPlanningOrDevelopmentQuery } from '../brain/MamtaBrainReal';
 import { AutonomousLoop } from '../brain/AutonomousLoop';
+import { Terminal } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   THINKING_STEPS, 
@@ -61,6 +62,7 @@ interface HomeViewProps {
   showUpgradeModal: boolean;
   setShowUpgradeModal: (show: boolean) => void;
   fetchSubscriptionMetrics: () => Promise<void>;
+  brain: MamtaBrainReal;
 }
 
 // Custom Markdown text renderer with interactive Node.js Sandboxed Code execution
@@ -249,15 +251,17 @@ export default function HomeView({
   setSubscriptionMetrics,
   showUpgradeModal,
   setShowUpgradeModal,
-  fetchSubscriptionMetrics
+  fetchSubscriptionMetrics,
+  brain
 }: HomeViewProps) {
-  const [brain] = useState(() => new MamtaBrainReal());
   
   const [currentSessionId, setCurrentSessionId] = useState(sessionId);
   const [sessions, setSessions] = useState<{ id: string; title: string }[]>([]);
   const [memory, setMemory] = useState<string[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMemoryOpen, setIsMemoryOpen] = useState(true);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
   const [newMemoryText, setNewMemoryText] = useState('');
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -379,6 +383,13 @@ export default function HomeView({
   useEffect(() => {
     const unsubscribe = brain.subscribeToPipeline((event) => {
       setPipelineEvent(event);
+      if (event && event.details) {
+        setTerminalLogs(prev => {
+          const detail = `🧠 [Brain] Step: ${event.step.toUpperCase()} - ${event.details}`;
+          if (prev[prev.length - 1] === detail) return prev; // avoid exact consecutive duplicate logs
+          return [...prev, detail];
+        });
+      }
     });
     return () => unsubscribe();
   }, [brain]);
@@ -522,6 +533,7 @@ export default function HomeView({
   useEffect(() => {
     const handleStatusUpdate = (status: string) => {
       setAutoStatus(status);
+      setTerminalLogs(prev => [...prev, `🤖 [AutoLoop] ${status}`]);
     };
 
     autoLoop.subscribe(handleStatusUpdate);
@@ -870,24 +882,90 @@ export default function HomeView({
 
     // Client-side block for Planning & Development queries exceeding limits
     const isDev = isPlanningOrDevelopmentQuery(trimmedInput);
-    if (isDev && subscriptionMetrics.limit !== Infinity && subscriptionMetrics.limit !== null && subscriptionMetrics.usage >= subscriptionMetrics.limit) {
-      setInput('');
-      setShowUpgradeModal(true);
-      const limitMsg: ChatMessage = {
-        id: 'limit-' + Date.now(),
-        sessionId: currentSessionId,
-        role: 'model',
-        content: `### ⛔ Development Limit Reached
-        
+    if (isDev) {
+      if (subscriptionMetrics.limit !== Infinity && subscriptionMetrics.limit !== null && subscriptionMetrics.usage >= subscriptionMetrics.limit) {
+        setInput('');
+        setShowUpgradeModal(true);
+        const limitMsg: ChatMessage = {
+          id: 'limit-' + Date.now(),
+          sessionId: currentSessionId,
+          role: 'model',
+          content: `### ⛔ Development Limit Reached
+          
 You have fully consumed the planning and development limit under your **${subscriptionMetrics.planName}**. 
 
 We have automatically popped up the **SaaS Subscription Upgrade** dashboard so you can securely upgrade your account to continue creating applications, compiling code, and executing sandboxed programs.
 
 *Note: Conversational chats remain **100% free and unlimited**. If you wish to continue chatting or exploring, you can simply close the popup modal.*`,
+          timestamp: new Date().toISOString(),
+          pageSource: 'home'
+        };
+        setMessages(prev => [...prev, limitMsg]);
+        return;
+      }
+
+      // Add user's development query message to chat
+      const userMsg: ChatMessage = {
+        id: 'user-' + Date.now(),
+        sessionId: currentSessionId,
+        role: 'user',
+        content: trimmedInput,
         timestamp: new Date().toISOString(),
         pageSource: 'home'
       };
-      setMessages(prev => [...prev, limitMsg]);
+      setMessages(prev => [...prev, userMsg]);
+      setInput('');
+      setIsThinking(true);
+      setThinkingStatusText('⚡ Planning project in our neural network...');
+
+      try {
+        // Formulate the project plan via backend API in real-time
+        const res = await fetch('/api/plans/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idea: trimmedInput,
+            sessionId: currentSessionId
+          })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        // Formulate transition message
+        const redirectMsg: ChatMessage = {
+          id: 'redirect-' + Date.now(),
+          sessionId: currentSessionId,
+          role: 'model',
+          content: `⚡ **Project Formulated Successfully!**
+          
+I have created a comprehensive Master Plan for your request: *"${trimmedInput}"*.
+
+I am now seamlessly redirecting you to the **Workspace Page** (our Devin-like Real AI Engine Room), where you will find the file explorer, code editor, live browser preview, and our real-time compilation terminal ready to build this project!`,
+          timestamp: new Date().toISOString(),
+          pageSource: 'home'
+        };
+        setMessages(prev => [...prev, redirectMsg]);
+
+        // Smoothly select plan and navigate to Workspace after a short delay
+        setTimeout(() => {
+          onSelectPlan(data.id);
+          setActiveTab('workspace');
+          setIsThinking(false);
+        }, 1200);
+
+      } catch (err: any) {
+        console.error('Plan formulation error:', err);
+        const errorMsg: ChatMessage = {
+          id: 'error-' + Date.now(),
+          sessionId: currentSessionId,
+          role: 'model',
+          content: `❌ **Failed to formulate plan:** ${err.message || 'Unknown network error'}\n\nPlease try again or verify your connection settings.`,
+          timestamp: new Date().toISOString(),
+          pageSource: 'home'
+        };
+        setMessages(prev => [...prev, errorMsg]);
+        setIsThinking(false);
+      }
       return;
     }
 
@@ -929,6 +1007,7 @@ Execution triggers and builds are only available in the Workspace tab. Please sw
     setMessages(prev => [...prev, userTempMsg]);
 
     setInput('');
+    setTerminalLogs(prev => [...prev, `> Query dispatched: "${trimmedInput}"`]);
     setIsThinking(true);
     setThinkingStatusText(THINKING_STEPS[0]);
 

@@ -1264,6 +1264,36 @@ app.post('/api/chats/run-code', async (req, res) => {
   }
 });
 
+app.post('/api/autonomous/run-command', async (req, res) => {
+  const { cmd } = req.body;
+  if (!cmd) {
+    return res.status(400).json({ error: 'Command is required' });
+  }
+
+  console.log(`⚡ [Autonomous Executor] Running shell command: "${cmd}"`);
+  try {
+    const { exec } = await import('child_process');
+    exec(cmd, { timeout: 30000 }, (err: any, stdout: string, stderr: string) => {
+      if (err) {
+        return res.json({
+          success: false,
+          stdout,
+          stderr: stderr || err.message,
+          error: err.message
+        });
+      }
+      res.json({
+        success: true,
+        stdout,
+        stderr
+      });
+    });
+  } catch (err: any) {
+    console.error('Autonomous execution endpoint error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/chats/search', async (req, res) => {
   const { query } = req.body;
   if (!query) {

@@ -5,6 +5,7 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
+import * as pdf from 'pdf-parse';
 
 // Load environment variables
 dotenv.config();
@@ -17,6 +18,9 @@ import { AutoMarketing } from './src/marketing/AutoMarketing';
 import multer from 'multer';
 import { generateVoice as localGenerateVoice } from './src/voice/VoiceCloneEngine';
 import { listVoiceModels, voiceLibrary } from './src/voice/VoiceLibrary';
+import { createVideo as createAvatarVideo } from './src/avatar/VideoEngine';
+import { uploadVideo as uploadAvatarVideo } from './src/avatar/YouTubeCreator';
+import { getEmotionProfile } from './src/avatar/EmotionEngine';
 
 
 import { 
@@ -703,14 +707,23 @@ function getGeminiClient(): GoogleGenAI {
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY is not configured in the environment. Please add it via Settings > Secrets in the AI Studio panel.');
     }
-    aiClient = new GoogleGenAI({
-      apiKey: apiKey,
+
+    const isOAuthToken = apiKey.startsWith('ya29.') || apiKey.startsWith('ey');
+    const config: any = {
       httpOptions: {
         headers: {
           'User-Agent': 'aistudio-build',
         }
       }
-    });
+    };
+
+    if (isOAuthToken) {
+      config.httpOptions.headers['Authorization'] = `Bearer ${apiKey}`;
+    } else {
+      config.apiKey = apiKey;
+    }
+
+    aiClient = new GoogleGenAI(config);
   }
   return aiClient;
 }
@@ -935,8 +948,69 @@ Bilingual capabilities ke sath main Hindi, English, aur Hinglish me seamlessly i
 मैं इस विषय में अपने ज्ञान कोश को लगातार समृद्ध कर रही हूँ ताकि भविष्य में आपको और अधिक प्रमाणिक, वैज्ञानिक और तथ्य-आधारित जानकारी प्रदान कर सकूँ। यदि आपके पास कोई विशिष्ट प्रश्न है, तो कृपया पूछें! 🧠🧬`;
 }
 
+async function performSearchHelper(queryStr: string) {
+  const encoded = encodeURIComponent(queryStr);
+  const ddgUrl = `https://api.duckduckgo.com/?q=${encoded}&format=json&no_html=1&no_redirect=1`;
+  
+  try {
+    const response = await fetch(ddgUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    let abstractText = "";
+    let results: any[] = [];
+
+    if (response.ok) {
+      const data: any = await response.json();
+      abstractText = data.AbstractText || "";
+      if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+        results = data.RelatedTopics
+          .slice(0, 4)
+          .map((item: any) => ({
+            title: item.FirstURL ? item.FirstURL.split('/').pop()?.replace(/_/g, ' ') : "Related Topic",
+            text: item.Text,
+            url: item.FirstURL
+          }))
+          .filter((item: any) => item.text && item.url);
+      }
+    }
+
+    if (!abstractText) {
+      const wikiSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encoded}&format=json&origin=*`;
+      const wikiRes = await fetch(wikiSearchUrl);
+      if (wikiRes.ok) {
+        const wikiData: any = await wikiRes.json();
+        const searchResults = wikiData.query?.search;
+        if (searchResults && searchResults.length > 0) {
+          const firstPageId = searchResults[0].pageid;
+          const wikiContentUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&pageids=${firstPageId}&format=json&origin=*`;
+          const contentRes = await fetch(wikiContentUrl);
+          if (contentRes.ok) {
+            const contentData: any = await contentRes.json();
+            const pageInfo = contentData.query?.pages[firstPageId];
+            abstractText = pageInfo?.extract || searchResults[0].snippet.replace(/<[^>]*>/g, '');
+            
+            results = searchResults.slice(0, 3).map((item: any) => ({
+              title: item.title,
+              text: item.snippet.replace(/<[^>]*>/g, ''),
+              url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title)}`
+            }));
+          }
+        }
+      }
+    }
+
+    return { abstract: abstractText, results };
+  } catch (err) {
+    console.error('Search helper failed:', err);
+    return null;
+  }
+}
+
 app.post('/api/chats', async (req, res) => {
-  const { sessionId, content, pageSource, intent } = req.body;
+  const { sessionId, content, pageSource, intent, fileAttachment, webSearch } = req.body;
   if (!sessionId || !content) {
     return res.status(400).json({ error: 'sessionId and content are required' });
   }
@@ -1000,8 +1074,54 @@ Current user intent detected as: ${intent || 'chat'}.`;
         history: contextHistory
       });
 
+      // RAG search if requested
+      let finalContent = content;
+      if (webSearch) {
+        console.log(`🔍 [ChatsAPI] Performing automated web search RAG for query: "${content}"`);
+        try {
+          const searchRes = await performSearchHelper(content);
+          if (searchRes && searchRes.abstract) {
+            let searchContext = `[Web Search Context]\nQuery: "${content}"\nSearch Abstract: ${searchRes.abstract}\n`;
+            if (searchRes.results && searchRes.results.length > 0) {
+              searchContext += `References:\n` + searchRes.results.map((r: any) => `- [${r.title}](${r.url}): ${r.text}`).join('\n') + `\n`;
+            }
+            finalContent = `${searchContext}\n---\nUser Message: ${content}`;
+          }
+        } catch (searchErr) {
+          console.warn("RAG search failed, continuing without search context:", searchErr);
+        }
+      }
+
+      // Process File Attachment context if text-based
+      if (fileAttachment && fileAttachment.textContent) {
+        console.log(`📎 [ChatsAPI] Injecting text file context: ${fileAttachment.name}`);
+        finalContent = `[Attached File: ${fileAttachment.name} (${fileAttachment.type})]
+---
+${fileAttachment.textContent}
+---
+User Message/Question: ${finalContent}`;
+      }
+
+      let messagePayload: any = finalContent;
+      
+      if (fileAttachment && fileAttachment.base64 && fileAttachment.type.startsWith('image/')) {
+        console.log(`🖼️ [ChatsAPI] Injecting multimodal image context: ${fileAttachment.name}`);
+        const base64Raw = fileAttachment.base64.split(',')[1] || fileAttachment.base64;
+        messagePayload = [
+          {
+            inlineData: {
+              data: base64Raw,
+              mimeType: fileAttachment.type
+            }
+          },
+          {
+            text: finalContent
+          }
+        ];
+      }
+
       const response = await chatInstance.sendMessage({
-        message: content
+        message: messagePayload
       });
 
       replyText = response.text || "I processed your request, but received empty response.";
@@ -1030,6 +1150,195 @@ Current user intent detected as: ${intent || 'chat'}.`;
 
   } catch (err: any) {
     console.error('Chat endpoint error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// CODETALENTS & CHATGPT SUPERMODE ADDITIONS
+// ----------------------------------------------------
+const fileUpload = multer({ dest: 'temp_uploads/' });
+
+app.post('/api/chats/upload', fileUpload.single('file'), async (req, res) => {
+  const file = req.file;
+  if (!file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  try {
+    const isPdf = file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf');
+    const isImage = file.mimetype.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(file.originalname);
+    
+    if (isPdf) {
+      console.log(`📄 [ChatsAPI] Parsing PDF upload: ${file.originalname}`);
+      const fileBuffer = fs.readFileSync(file.path);
+      const pdfParser = (pdf as any).default || pdf;
+      const data = await pdfParser(fileBuffer);
+      res.json({
+        success: true,
+        fileName: file.originalname,
+        fileType: file.mimetype,
+        textContent: data.text || "Empty PDF content",
+        isPdf: true
+      });
+    } else if (isImage) {
+      console.log(`🖼️ [ChatsAPI] Parsing Image upload: ${file.originalname}`);
+      const fileBuffer = fs.readFileSync(file.path);
+      const base64Data = fileBuffer.toString('base64');
+      res.json({
+        success: true,
+        fileName: file.originalname,
+        fileType: file.mimetype,
+        base64: `data:${file.mimetype};base64,${base64Data}`,
+        isImage: true
+      });
+    } else {
+      console.log(`📝 [ChatsAPI] Parsing Text upload: ${file.originalname}`);
+      const textContent = fs.readFileSync(file.path, 'utf8');
+      res.json({
+        success: true,
+        fileName: file.originalname,
+        fileType: file.mimetype,
+        textContent,
+        isText: true
+      });
+    }
+  } catch (err: any) {
+    console.error('File parsing error:', err);
+    res.status(500).json({ error: `File processing failed: ${err.message}` });
+  } finally {
+    try {
+      if (fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+    } catch (cleanupErr) {
+      console.warn('Multer temp file cleanup warning:', cleanupErr);
+    }
+  }
+});
+
+app.post('/api/chats/run-code', async (req, res) => {
+  const { code } = req.body;
+  if (!code) {
+    return res.status(400).json({ error: 'Code content is required' });
+  }
+
+  console.log(`💻 [CodeRunner] Running sandboxed JS execution...`);
+  const uniqueId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const tempFile = path.join(process.cwd(), `temp_run_${uniqueId}.js`);
+
+  try {
+    fs.writeFileSync(tempFile, code);
+    const { exec } = await import('child_process');
+    
+    exec(`node "${tempFile}"`, { timeout: 6000 }, (err: any, stdout: string, stderr: string) => {
+      try {
+        if (fs.existsSync(tempFile)) {
+          fs.unlinkSync(tempFile);
+        }
+      } catch (ce) {}
+
+      if (err) {
+        return res.json({
+          success: false,
+          stdout,
+          stderr: stderr || err.message,
+          error: err.message
+        });
+      }
+
+      res.json({
+        success: true,
+        stdout,
+        stderr
+      });
+    });
+  } catch (err: any) {
+    try {
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile);
+      }
+    } catch (ce) {}
+    console.error('Code execution endpoint error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/chats/search', async (req, res) => {
+  const { query } = req.body;
+  if (!query) {
+    return res.status(400).json({ error: 'Query is required' });
+  }
+
+  console.log(`🌐 [SearchEngine] Searching the web for: "${query}"`);
+
+  try {
+    const encoded = encodeURIComponent(query);
+    const ddgUrl = `https://api.duckduckgo.com/?q=${encoded}&format=json&no_html=1&no_redirect=1`;
+    
+    const response = await fetch(ddgUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    let abstractText = "";
+    let results: any[] = [];
+
+    if (response.ok) {
+      const data: any = await response.json();
+      abstractText = data.AbstractText || "";
+      if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+        results = data.RelatedTopics
+          .slice(0, 4)
+          .map((item: any) => ({
+            title: item.FirstURL ? item.FirstURL.split('/').pop()?.replace(/_/g, ' ') : "Related Topic",
+            text: item.Text,
+            url: item.FirstURL
+          }))
+          .filter((item: any) => item.text && item.url);
+      }
+    }
+
+    if (!abstractText) {
+      console.log(`🌐 [SearchEngine] No abstract answer. Trying Wikipedia search fallback...`);
+      const wikiSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encoded}&format=json&origin=*`;
+      const wikiRes = await fetch(wikiSearchUrl);
+      if (wikiRes.ok) {
+        const wikiData: any = await wikiRes.json();
+        const searchResults = wikiData.query?.search;
+        if (searchResults && searchResults.length > 0) {
+          const firstPageId = searchResults[0].pageid;
+          const wikiContentUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&pageids=${firstPageId}&format=json&origin=*`;
+          const contentRes = await fetch(wikiContentUrl);
+          if (contentRes.ok) {
+            const contentData: any = await contentRes.json();
+            const pageInfo = contentData.query?.pages[firstPageId];
+            abstractText = pageInfo?.extract || searchResults[0].snippet.replace(/<[^>]*>/g, '');
+            
+            results = searchResults.slice(0, 3).map((item: any) => ({
+              title: item.title,
+              text: item.snippet.replace(/<[^>]*>/g, ''),
+              url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title)}`
+            }));
+          }
+        }
+      }
+    }
+
+    if (!abstractText) {
+      abstractText = `Searched for "${query}" but found no immediate encyclopedia abstract. Please narrow your query or check back later.`;
+    }
+
+    res.json({
+      success: true,
+      query,
+      abstract: abstractText,
+      results
+    });
+
+  } catch (err: any) {
+    console.error('Search endpoint failed:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2086,6 +2395,98 @@ app.post('/api/voice/generate', async (req, res) => {
     res.sendFile(path.resolve(finalFile));
   } catch (err: any) {
     console.error('Voice generate endpoint failed:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// MAMTA AVATAR AI ENGINE ENDPOINTS
+// ----------------------------------------------------
+app.use('/output', express.static(path.join(process.cwd(), 'output')));
+
+app.post('/api/avatar/generate', async (req, res) => {
+  const { text, avatarImage, sessionId } = req.body;
+  if (!text) {
+    return res.status(400).json({ error: 'Script text prompt is required' });
+  }
+
+  try {
+    console.log(`🤖 [AvatarAPI] Generating talking avatar for text: "${text.slice(0, 40)}..."`);
+    const result = await createAvatarVideo(text, avatarImage, sessionId);
+    
+    // Add activity log
+    if (sessionId) {
+      try {
+        await firestoreLogs.addActivityLog({
+          action: 'Generate Avatar Video',
+          page: 'workspace',
+          userSession: sessionId,
+          details: `Generated talking avatar with emotion [${result.emotion.toUpperCase()}] for script: "${text.slice(0, 30)}..."`
+        });
+      } catch (e) {}
+    }
+
+    res.json({
+      success: true,
+      videoUrl: `/output/${path.basename(result.videoPath)}`,
+      audioUrl: `/api/avatar/audio?file=${path.basename(result.audioPath)}`,
+      videoPath: result.videoPath,
+      audioPath: result.audioPath,
+      emotion: result.emotion,
+      scriptText: result.scriptText,
+      avatarImage: result.avatarImage,
+      timestamp: result.timestamp
+    });
+  } catch (err: any) {
+    console.error('Avatar generate endpoint failed:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint to stream avatar sound file
+app.get('/api/avatar/audio', (req, res) => {
+  const file = req.query.file as string;
+  if (!file) return res.status(400).json({ error: 'file parameter is required' });
+  
+  const safeFile = path.basename(file);
+  const fullPath = path.join(process.cwd(), safeFile);
+  
+  if (fs.existsSync(fullPath)) {
+    res.sendFile(fullPath);
+  } else {
+    res.status(404).json({ error: 'Audio file not found' });
+  }
+});
+
+app.post('/api/avatar/youtube-upload', async (req, res) => {
+  const { videoPath, title, description, tags, privacyStatus, sessionId } = req.body;
+  if (!videoPath) {
+    return res.status(400).json({ error: 'videoPath parameter is required' });
+  }
+
+  try {
+    console.log(`📺 [AvatarAPI] Uploading compiled video [${videoPath}] to YouTube...`);
+    const uploadResult = await uploadAvatarVideo(videoPath, {
+      title: title || 'Mamta AI Autonomous Video',
+      description: description || 'Generated automatically by Mamta Avatar AI Creator Engine.',
+      tags: tags || ['MamtaAI', 'SaaS', 'AI', 'AutonomousCreator'],
+      privacyStatus: privacyStatus || 'public'
+    });
+
+    if (sessionId) {
+      try {
+        await firestoreLogs.addActivityLog({
+          action: 'Upload YouTube Video',
+          page: 'workspace',
+          userSession: sessionId,
+          details: `Uploaded video titled "${title || 'Untitled'}" to YouTube (Simulated: ${uploadResult.simulated})`
+        });
+      } catch (e) {}
+    }
+
+    res.json(uploadResult);
+  } catch (err: any) {
+    console.error('YouTube upload endpoint failed:', err);
     res.status(500).json({ error: err.message });
   }
 });

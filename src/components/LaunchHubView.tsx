@@ -36,6 +36,7 @@ import { ViralEngine } from '../growth/ViralEngine';
 import { DistributionEngine } from '../growth/DistributionEngine';
 import { GrowthAutomation } from '../growth/GrowthAutomation';
 import MamtaVoiceStudio from './MamtaVoiceStudio';
+import MamtaAvatarStudio from './MamtaAvatarStudio';
 
 
 interface LaunchHubViewProps {
@@ -547,6 +548,9 @@ export default function LaunchHubView({ sessionId }: LaunchHubViewProps) {
 
           {/* 🎙️ MAMTA VOICE AI STUDIO */}
           <MamtaVoiceStudio sessionId={sessionId} />
+
+          {/* 🎥 MAMTA AVATAR AI STUDIO */}
+          <MamtaAvatarStudio sessionId={sessionId} />
 
           {/* 🚀🔥 FULL AUTOMATION AI MARKETING SYSTEM (PRO MAX) */}
           <div className="bg-slate-900/40 border border-slate-900 rounded-2xl p-6 space-y-6 backdrop-blur-xl relative overflow-hidden shadow-2xl">

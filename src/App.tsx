@@ -249,7 +249,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* 2. CORE VIEW CONTENT WRAPPER */}
-      <main className="flex-1 flex flex-col p-2.5 lg:p-3.5 mt-14 lg:mt-0 overflow-hidden relative z-10">
+      <main className="flex-1 flex flex-col p-2.5 lg:p-3.5 pt-16 lg:pt-3.5 overflow-hidden relative z-10">
         
         <ErrorBoundary>
           <AnimatePresence mode="wait">

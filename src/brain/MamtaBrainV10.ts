@@ -115,6 +115,9 @@ export class ExecutorEngine {
 
       case "Generate Response":
         try {
+          const fileAttachment = (this as any).uploadedFile || null;
+          const webSearch = (this as any).webSearchEnabled || false;
+          
           const res = await fetch("/api/chats", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -122,7 +125,9 @@ export class ExecutorEngine {
               sessionId: sessionId || "default-session", 
               content: input, 
               pageSource: "home",
-              intent: intent || "chat"
+              intent: intent || "chat",
+              fileAttachment,
+              webSearch
             })
           });
           const data = await res.json();
@@ -313,6 +318,9 @@ export class MamtaBrainV10 {
 
   async aiBrain(input: string, sessionId: string, intent: string): Promise<string> {
     try {
+      const fileAttachment = (this as any).uploadedFile || null;
+      const webSearch = (this as any).webSearchEnabled || false;
+
       const res = await fetch("/api/chats", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -320,7 +328,9 @@ export class MamtaBrainV10 {
           sessionId, 
           content: input, 
           pageSource: "home",
-          intent: intent
+          intent: intent,
+          fileAttachment,
+          webSearch
         })
       });
 

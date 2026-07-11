@@ -15,7 +15,22 @@ import {
   Zap,
   LogIn,
   LogOut,
-  Info
+  Info,
+  Menu,
+  X,
+  Brain,
+  MessageSquare,
+  History,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Paperclip,
+  Search,
+  Play,
+  FileText,
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -23,6 +38,12 @@ import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestor
 import { MamtaBrainReal } from '../brain/MamtaBrainReal';
 import { AutonomousLoop } from '../brain/AutonomousLoop';
 import { motion, AnimatePresence } from 'motion/react';
+import { 
+  THINKING_STEPS, 
+  enhanceResponse, 
+  generateFollowups, 
+  extractActiveTopic 
+} from '../brain/HumanChatEngine';
 
 interface HomeViewProps {
   sessionId: string;
@@ -30,66 +51,166 @@ interface HomeViewProps {
   setActiveTab: (tab: 'home' | 'workspace' | 'admin' | 'safedrop') => void;
 }
 
-// Custom Markdown text renderer
+// Custom Markdown text renderer with interactive Node.js Sandboxed Code execution
 const MarkdownText: React.FC<{ text: string }> = ({ text }) => {
-  const lines = text.split('\n');
+  const [outputs, setOutputs] = useState<Record<number, { stdout: string; stderr: string; isRunning: boolean }>>({});
+
+  const runCodeSandbox = async (code: string, index: number) => {
+    setOutputs(prev => ({ ...prev, [index]: { stdout: '', stderr: '', isRunning: true } }));
+    try {
+      const res = await fetch('/api/chats/run-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+      setOutputs(prev => ({
+        ...prev,
+        [index]: {
+          stdout: data.stdout || '',
+          stderr: data.stderr || data.error || '',
+          isRunning: false
+        }
+      }));
+    } catch (err: any) {
+      setOutputs(prev => ({
+        ...prev,
+        [index]: {
+          stdout: '',
+          stderr: err.message || 'Execution failed',
+          isRunning: false
+        }
+      }));
+    }
+  };
+
+  const segments: Array<{ type: 'text' | 'code'; content: string; language?: string }> = [];
+  const parts = text.split('```');
+  
+  for (let idx = 0; idx < parts.length; idx++) {
+    if (idx % 2 === 1) {
+      const lines = parts[idx].split('\n');
+      const language = lines[0].trim();
+      const content = lines.slice(1).join('\n');
+      segments.push({ type: 'code', content, language });
+    } else {
+      if (parts[idx]) {
+        segments.push({ type: 'text', content: parts[idx] });
+      }
+    }
+  }
+
   return (
-    <div className="space-y-2 text-sm leading-relaxed text-slate-200 font-sans">
-      {lines.map((line, i) => {
-        // Bullet points
-        if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+    <div className="space-y-4 text-sm leading-relaxed text-slate-200 font-sans">
+      {segments.map((seg, segIdx) => {
+        if (seg.type === 'code') {
+          const isRunnable = seg.language === 'js' || seg.language === 'javascript' || seg.language === 'ts' || seg.language === 'typescript' || !seg.language;
+          const output = outputs[segIdx];
+
           return (
-            <ul key={i} className="list-disc pl-5 my-1 text-slate-300">
-              <li>{line.replace(/^[-*]\s+/, '')}</li>
-            </ul>
+            <div key={segIdx} className="my-3 rounded-xl border border-slate-900/80 overflow-hidden bg-slate-950/80">
+              <div className="flex items-center justify-between px-4 py-2 bg-slate-950 border-b border-slate-900 text-[11px] font-mono text-slate-400">
+                <span>{seg.language || 'javascript'}</span>
+                {isRunnable && (
+                  <button
+                    onClick={() => runCodeSandbox(seg.content, segIdx)}
+                    disabled={output?.isRunning}
+                    className="px-2 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-400 transition-all cursor-pointer text-[10px] font-bold flex items-center gap-1"
+                  >
+                    {output?.isRunning ? (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                        <span>Running...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-2.5 h-2.5" />
+                        <span>Run Code</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+              <pre className="p-4 font-mono text-xs overflow-x-auto text-emerald-300/90 leading-normal bg-slate-950/90">
+                <code>{seg.content}</code>
+              </pre>
+              {output && (
+                <div className="border-t border-slate-900 bg-slate-900/20 p-3 font-mono text-[11px]">
+                  <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Sandbox Execution Output:</p>
+                  {output.stdout && (
+                    <pre className="text-slate-200 bg-slate-950/40 p-2 rounded border border-slate-900/50 max-h-40 overflow-y-auto whitespace-pre-wrap">{output.stdout}</pre>
+                  )}
+                  {output.stderr && (
+                    <pre className="text-rose-400 bg-rose-500/5 p-2 rounded border border-rose-500/10 max-h-40 overflow-y-auto whitespace-pre-wrap">{output.stderr}</pre>
+                  )}
+                  {!output.stdout && !output.stderr && !output.isRunning && (
+                    <p className="text-slate-500 italic">Code executed successfully with no console output.</p>
+                  )}
+                </div>
+              )}
+            </div>
           );
         }
-        // Headings
-        if (line.startsWith('### ')) {
-          return <h4 key={i} className="text-sm font-semibold text-emerald-400 mt-4 mb-2">{line.replace('### ', '')}</h4>;
-        }
-        if (line.startsWith('## ')) {
-          return <h3 key={i} className="text-base font-semibold text-emerald-400 mt-5 mb-2 border-b border-slate-800 pb-1">{line.replace('## ', '')}</h3>;
-        }
-        if (line.startsWith('# ')) {
-          return <h2 key={i} className="text-lg font-bold text-emerald-300 mt-6 mb-3">{line.replace('# ', '')}</h2>;
-        }
-        // Bold formatting
-        const parts = line.split('**');
-        if (parts.length > 1) {
-          return (
-            <p key={i}>
-              {parts.map((part, idx) => (idx % 2 === 1 ? <strong key={idx} className="text-emerald-300 font-semibold">{part}</strong> : part))}
-            </p>
-          );
-        }
-        // Empty lines
-        if (line.trim() === '') {
-          return <div key={i} className="h-2" />;
-        }
-        return <p key={i}>{line}</p>;
+
+        const lines = seg.content.split('\n');
+        return (
+          <div key={segIdx} className="space-y-1.5">
+            {lines.map((line, i) => {
+              if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+                return (
+                  <ul key={i} className="list-disc pl-5 my-1 text-slate-300">
+                    <li>{line.replace(/^[-*]\s+/, '')}</li>
+                  </ul>
+                );
+              }
+              if (line.startsWith('### ')) {
+                return <h4 key={i} className="text-sm font-semibold text-emerald-400 mt-4 mb-2">{line.replace('### ', '')}</h4>;
+              }
+              if (line.startsWith('## ')) {
+                return <h3 key={i} className="text-base font-semibold text-emerald-400 mt-5 mb-2 border-b border-slate-800 pb-1">{line.replace('## ', '')}</h3>;
+              }
+              if (line.startsWith('# ')) {
+                return <h2 key={i} className="text-lg font-bold text-emerald-300 mt-6 mb-3">{line.replace('# ', '')}</h2>;
+              }
+              const parts = line.split('**');
+              if (parts.length > 1) {
+                return (
+                  <p key={i}>
+                    {parts.map((part, idx) => (idx % 2 === 1 ? <strong key={idx} className="text-emerald-300 font-semibold">{part}</strong> : part))}
+                  </p>
+                );
+              }
+              if (line.trim() === '') {
+                return <div key={i} className="h-2" />;
+              }
+              return <p key={i}>{line}</p>;
+            })}
+          </div>
+        );
       })}
     </div>
   );
 };
 
-// Word-by-word Streaming text simulation
+// Character-by-character Streaming text simulation with human speed feel
 const StreamingResponse: React.FC<{ text: string; onComplete?: () => void }> = ({ text, onComplete }) => {
   const [displayedText, setDisplayedText] = useState('');
+  const [isComplete, setIsComplete] = useState(false);
   
   useEffect(() => {
-    const words = text.split(' ');
     let index = 0;
     setDisplayedText('');
+    setIsComplete(false);
     
     const interval = setInterval(() => {
-      setDisplayedText(prev => prev + (prev ? ' ' : '') + words[index]);
+      setDisplayedText(text.slice(0, index + 1));
       index++;
-      if (index >= words.length) {
+      if (index >= text.length) {
         clearInterval(interval);
+        setIsComplete(true);
         if (onComplete) onComplete();
       }
-    }, 20); // slick word-by-word typing effect
+    }, 12); // Real human-like characters-by-characters feel typing delay (12-15ms)
     
     return () => clearInterval(interval);
   }, [text]);
@@ -97,7 +218,9 @@ const StreamingResponse: React.FC<{ text: string; onComplete?: () => void }> = (
   return (
     <div className="relative">
       <MarkdownText text={displayedText} />
-      <span className="inline-block w-1.5 h-3.5 bg-emerald-400 ml-1 animate-[pulse_0.6s_infinite] align-middle shrink-0" />
+      {!isComplete && (
+        <span className="inline-block w-1.5 h-3.5 bg-emerald-400 ml-1 animate-[pulse_0.6s_infinite] align-middle shrink-0" />
+      )}
     </div>
   );
 };
@@ -108,6 +231,38 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
   // Real World SaaS Subscription & Auth states
   const [userEmail, setUserEmail] = useState<string>('rajveersinghm675@gmail.com');
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(true); // default logged in
+
+  const [currentSessionId, setCurrentSessionId] = useState(sessionId);
+  const [sessions, setSessions] = useState<{ id: string; title: string }[]>([]);
+  const [memory, setMemory] = useState<string[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMemoryOpen, setIsMemoryOpen] = useState(true);
+  const [newMemoryText, setNewMemoryText] = useState('');
+
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
+  const [thinkingStatusText, setThinkingStatusText] = useState('🧠 Understanding your question...');
+  const [activeTopic, setActiveTopic] = useState<string | null>('General SaaS Coding');
+  const [lastModelMsgId, setLastModelMsgId] = useState<string | null>(null);
+  const [completedStreams, setCompletedStreams] = useState<Record<string, boolean>>({});
+
+  // ChatGPT Supermode states
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [autoSpeakEnabled, setAutoSpeakEnabled] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<{
+    name: string;
+    type: string;
+    textContent?: string;
+    base64?: string;
+  } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [subscriptionMetrics, setSubscriptionMetrics] = useState<any>({
     planName: 'Free Tier',
     usage: 0,
@@ -121,7 +276,7 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
 
   const fetchSubscriptionMetrics = async () => {
     try {
-      const res = await fetch(`/api/payments/dashboard?sessionId=${sessionId}`);
+      const res = await fetch(`/api/payments/dashboard?sessionId=${currentSessionId}`);
       const data = await res.json();
       if (data && !data.error) {
         setSubscriptionMetrics(data);
@@ -133,7 +288,7 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
 
   useEffect(() => {
     fetchSubscriptionMetrics();
-  }, [sessionId]);
+  }, [currentSessionId]);
 
   const handleLogin = () => {
     // Simulated Google OAuth Flow
@@ -157,7 +312,7 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
       const orderRes = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, sessionId })
+        body: JSON.stringify({ amount, sessionId: currentSessionId })
       });
       const order = await orderRes.json();
       if (order.error) throw new Error(order.error);
@@ -180,7 +335,7 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
       const upgradeRes = await fetch('/api/payments/upgrade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, planKey, amount })
+        body: JSON.stringify({ sessionId: currentSessionId, planKey, amount })
       });
       const upgradeData = await upgradeRes.json();
       if (upgradeData.error) throw new Error(upgradeData.error);
@@ -195,11 +350,7 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
     }
   };
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
-  const [lastModelMsgId, setLastModelMsgId] = useState<string | null>(null);
-  const [completedStreams, setCompletedStreams] = useState<Record<string, boolean>>({});
+
   const [pipelineEvent, setPipelineEvent] = useState<{
     step: 'idle' | 'thinking' | 'planning' | 'executing' | 'verifying';
     details?: string;
@@ -214,6 +365,137 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
     });
     return () => unsubscribe();
   }, [brain]);
+
+  // 1. Load or initialize sessions
+  useEffect(() => {
+    const stored = localStorage.getItem('mamta_sessions');
+    let loadedSessions: { id: string; title: string }[] = [];
+    if (stored) {
+      try {
+        loadedSessions = JSON.parse(stored);
+      } catch (e) {
+        console.error('Error parsing stored sessions:', e);
+      }
+    }
+    
+    // Ensure current active session is present
+    const hasCurrentProp = loadedSessions.some(s => s.id === sessionId);
+    if (loadedSessions.length === 0 || (sessionId && !hasCurrentProp)) {
+      const defaultSession = {
+        id: sessionId || 'session_default',
+        title: 'Current Active Chat'
+      };
+      if (!hasCurrentProp) {
+        loadedSessions.unshift(defaultSession);
+      }
+      localStorage.setItem('mamta_sessions', JSON.stringify(loadedSessions));
+    }
+    setSessions(loadedSessions);
+    // Sync current session ID on initial load
+    if (sessionId) {
+      setCurrentSessionId(sessionId);
+    }
+  }, [sessionId]);
+
+  // Sync currentSessionId state if sessionId prop changes
+  useEffect(() => {
+    if (sessionId) {
+      setCurrentSessionId(sessionId);
+    }
+  }, [sessionId]);
+
+  // 2. Load or initialize memory profile
+  useEffect(() => {
+    const stored = localStorage.getItem('mamta_memory');
+    if (stored) {
+      try {
+        setMemory(JSON.parse(stored));
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      const initialMemory = [
+        "User prefers production-grade code 🚀",
+        "Prefers TypeScript & modular components 💻",
+        "Autonomous Agent mode active 🤖"
+      ];
+      setMemory(initialMemory);
+      localStorage.setItem('mamta_memory', JSON.stringify(initialMemory));
+    }
+  }, []);
+
+  // 3. Auto-remember topics when activeTopic changes
+  useEffect(() => {
+    if (activeTopic) {
+      setMemory(prev => {
+        const formatted = `Interested in: ${activeTopic} 🧠`;
+        if (!prev.includes(formatted)) {
+          const updated = [formatted, ...prev].slice(0, 8); // Keep last 8 memories
+          localStorage.setItem('mamta_memory', JSON.stringify(updated));
+          return updated;
+        }
+        return prev;
+      });
+    }
+  }, [activeTopic]);
+
+  // 4. Session Action Handlers
+  const handleNewChat = () => {
+    const newId = 'session_' + Math.random().toString(36).substring(2, 11);
+    const newSession = {
+      id: newId,
+      title: 'New Chat ' + (sessions.length + 1)
+    };
+    const updated = [newSession, ...sessions];
+    setSessions(updated);
+    localStorage.setItem('mamta_sessions', JSON.stringify(updated));
+    setCurrentSessionId(newId);
+  };
+
+  const handleDeleteSession = (idToDelete: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = sessions.filter(s => s.id !== idToDelete);
+    setSessions(updated);
+    localStorage.setItem('mamta_sessions', JSON.stringify(updated));
+    if (currentSessionId === idToDelete) {
+      if (updated.length > 0) {
+        setCurrentSessionId(updated[0].id);
+      } else {
+        const newId = 'session_' + Math.random().toString(36).substring(2, 11);
+        const newSession = { id: newId, title: 'New Chat 1' };
+        setSessions([newSession]);
+        localStorage.setItem('mamta_sessions', JSON.stringify([newSession]));
+        setCurrentSessionId(newId);
+      }
+    }
+  };
+
+  // 5. Memory Action Handlers
+  const handleAddMemory = () => {
+    if (!newMemoryText.trim()) return;
+    setMemory(prev => {
+      const formatted = `${newMemoryText.trim()}`;
+      if (!prev.includes(formatted)) {
+        const updated = [formatted, ...prev];
+        localStorage.setItem('mamta_memory', JSON.stringify(updated));
+        return updated;
+      }
+      return prev;
+    });
+    setNewMemoryText('');
+  };
+
+  const handleDeleteMemory = (idxToDelete: number) => {
+    const updated = memory.filter((_, i) => i !== idxToDelete);
+    setMemory(updated);
+    localStorage.setItem('mamta_memory', JSON.stringify(updated));
+  };
+
+  const handleClearAllMemories = () => {
+    if (!window.confirm('Are you sure you want to clear all memories?')) return;
+    setMemory([]);
+    localStorage.setItem('mamta_memory', JSON.stringify([]));
+  };
 
   // V10 Autonomous Loop management
   const [autoLoop] = useState(() => new AutonomousLoop(brain));
@@ -246,22 +528,22 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
   
   // Suggested templates (ChatGPT clone starter templates)
   const SUGGESTED_PROMPTS = [
-    { label: 'build startup "TaskFlow AI"', sub: 'Execute Level 10 complete AI company launch' },
-    { label: 'run project', sub: 'Execute Level 9 automated run-test-deploy loop' },
-    { label: '/plan Resume website', sub: 'Generate structural master plan' },
-    { label: '/wiki MAMTA AI Architecture', sub: 'Learn about core intelligence system' }
+    { label: 'Create AI SaaS idea', sub: 'Generate structural master plan & MVP architecture' },
+    { label: 'Build marketing strategy', sub: 'Formulate viral growth loops & channel strategy' },
+    { label: 'How to make money online', sub: 'Actionable blueprints for high-leverage products' },
+    { label: 'Explain AI simply', sub: 'Break down complex neural structures with examples' }
   ];
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to real-time chats from Firestore (Phase 10: Sync context)
   useEffect(() => {
-    if (!sessionId) return;
+    if (!currentSessionId) return;
 
     try {
       const q = query(
         collection(db, 'chats'),
-        where('sessionId', '==', sessionId),
+        where('sessionId', '==', currentSessionId),
         orderBy('timestamp', 'asc')
       );
 
@@ -315,7 +597,7 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
         fetchChatsREST();
       }
     }
-  }, [sessionId]);
+  }, [currentSessionId]);
 
   // Phase 7: Auto scroll system
   useEffect(() => {
@@ -325,7 +607,7 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
   // REST Fallback fetcher
   const fetchChatsREST = async () => {
     try {
-      const res = await fetch(`/api/chats?sessionId=${sessionId}`);
+      const res = await fetch(`/api/chats?sessionId=${currentSessionId}`);
       const data = await res.json();
       if (Array.isArray(data)) {
         setMessages(prev => {
@@ -344,10 +626,167 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
     }
   };
 
+  // Voice Input (Speech-to-Text) using WebSpeechAPI
+  const startListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech Recognition is not supported in this browser. Please try Google Chrome!");
+      return;
+    }
+    
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-IN"; // English with Indian accents / Hindi bilingual friendly
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error", event);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onresult = (e: any) => {
+      const text = e.results[0][0].transcript;
+      if (text) {
+        setInput(prev => prev ? prev + " " + text : text);
+      }
+      setIsListening(false);
+    };
+
+    recognition.start();
+  };
+
+  // Voice Output (Text-to-Speech) using Mamta Voice Clone Engine
+  const handleSpeak = async (text: string, msgId: string) => {
+    if (playingMsgId === msgId) {
+      if (audioElement) {
+        audioElement.pause();
+        setPlayingMsgId(null);
+      }
+      return;
+    }
+
+    try {
+      setPlayingMsgId(msgId);
+      
+      // Clean up previous playing audio
+      if (audioElement) {
+        audioElement.pause();
+      }
+
+      const cleanText = text.replace(/[*#`_\-\[\]\(\)]/g, ' '); // Clean markdown chars
+
+      const res = await fetch('/api/voice/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: cleanText, sessionId: currentSessionId })
+      });
+      
+      if (!res.ok) throw new Error('Failed to fetch dynamic clone audio file');
+      
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      
+      audio.onended = () => {
+        setPlayingMsgId(null);
+      };
+      
+      audio.onerror = () => {
+        setPlayingMsgId(null);
+      };
+      
+      setAudioElement(audio);
+      audio.play();
+    } catch (err) {
+      console.error('Failed to generate Voice Engine clone, trying browser speechSynthesis fallback:', err);
+      // Clean up
+      setPlayingMsgId(null);
+      
+      if ('speechSynthesis' in window) {
+        setPlayingMsgId(msgId);
+        window.speechSynthesis.cancel();
+        
+        const cleanText = text.replace(/[*#`_\-\[\]\(\)]/g, ' ');
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = 'en-IN';
+        
+        utterance.onend = () => {
+          setPlayingMsgId(null);
+        };
+        utterance.onerror = () => {
+          setPlayingMsgId(null);
+        };
+        
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+  };
+
+  // File Upload (PDF, Images, Text Files) with drag/drop & click
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/chats/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Upload failed');
+      }
+      const data = await res.json();
+
+      if (data.success) {
+        setUploadedFile({
+          name: data.fileName,
+          type: data.fileType,
+          textContent: data.textContent,
+          base64: data.base64
+        });
+      }
+    } catch (err: any) {
+      console.error('File upload error:', err);
+      alert(`File processing failed: ${err.message}`);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   // Phase 5 & 9: Brain integration & Performance (IsSending block)
   const handleSendMessage = async (textToSend: string) => {
     const trimmedInput = textToSend.trim();
     if (!trimmedInput || isThinking) return;
+
+    // Dynamically update session title based on first query
+    if (sessions.some(s => s.id === currentSessionId && (s.title.startsWith('New Chat') || s.title === 'Current Active Chat'))) {
+      const newTitle = trimmedInput.length > 25 ? trimmedInput.slice(0, 25) + '...' : trimmedInput;
+      const updated = sessions.map(s => s.id === currentSessionId ? { ...s, title: newTitle } : s);
+      setSessions(updated);
+      localStorage.setItem('mamta_sessions', JSON.stringify(updated));
+    }
 
     // Phase 6: Execution control (Intercept build & run commands)
     const lowerInput = trimmedInput.toLowerCase();
@@ -355,7 +794,7 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
       setInput('');
       const blockedMsg: ChatMessage = {
         id: 'block-' + Date.now(),
-        sessionId,
+        sessionId: currentSessionId,
         role: 'model',
         content: `⚠️ **Execution Blocked on Home Tab**
         
@@ -370,7 +809,7 @@ Execution triggers and builds are only available in the Workspace tab. Please sw
     // Instantly append user's message for real-time visual responsiveness
     const userTempMsg: ChatMessage = {
       id: 'user-temp-' + Date.now(),
-      sessionId,
+      sessionId: currentSessionId,
       role: 'user',
       content: trimmedInput,
       timestamp: new Date().toISOString(),
@@ -380,21 +819,45 @@ Execution triggers and builds are only available in the Workspace tab. Please sw
 
     setInput('');
     setIsThinking(true);
+    setThinkingStatusText(THINKING_STEPS[0]);
+
+    // Track/update the active memory topic based on query content
+    setActiveTopic(prev => extractActiveTopic(trimmedInput, prev));
 
     try {
-      // Process through MamtaBrainReal with robust usage check
-      const result = await brain.processWithUser(trimmedInput, sessionId, userEmail);
-      const response = result.text;
+      // 1. Concurrently run visual thinking steps simulation
+      const thinkingAnim = (async () => {
+        for (let i = 0; i < THINKING_STEPS.length; i++) {
+          setThinkingStatusText(THINKING_STEPS[i]);
+          await new Promise(r => setTimeout(r, 550));
+        }
+      })();
+
+      // 2. Attach file and web search params to the brain instance before processing
+      (brain as any).uploadedFile = uploadedFile;
+      (brain as any).webSearchEnabled = webSearchEnabled;
+
+      // Process real output through MamtaBrainReal
+      const brainPromise = brain.processWithUser(trimmedInput, currentSessionId, userEmail);
+
+      // Wait for both to complete beautifully to keep the professional, polished "AI thinking" pace
+      const [_, result] = await Promise.all([thinkingAnim, brainPromise]);
+      let response = result.text;
       
       // Update local metrics and subscription state immediately
       setSubscriptionMetrics(result.dashboard);
+
+      // Enhance the response with conversational humanness
+      if (response) {
+        response = enhanceResponse(response);
+      }
 
       // Append model response to UI state instantly as an optimistic model message, 
       // preventing any visual gaps or latency lag from the database call
       if (response) {
         const modelTempMsg: ChatMessage = {
           id: 'model-temp-' + Date.now(),
-          sessionId,
+          sessionId: currentSessionId,
           role: 'model',
           content: response,
           timestamp: new Date().toISOString(),
@@ -406,6 +869,11 @@ Execution triggers and builds are only available in the Workspace tab. Please sw
           }
           return [...prev, modelTempMsg];
         });
+
+        // Trigger TTS if Auto-Speak is active
+        if (autoSpeakEnabled) {
+          handleSpeak(response, modelTempMsg.id);
+        }
       }
 
       // Always trigger REST fetch to guarantee perfect state synchronization
@@ -418,7 +886,7 @@ Execution triggers and builds are only available in the Workspace tab. Please sw
       const errorMessage = err.message || 'Unknown network error occurred';
       const errorChatMsg: ChatMessage = {
         id: 'err-' + Date.now(),
-        sessionId,
+        sessionId: currentSessionId,
         role: 'model',
         content: `⚠️ **Mamta AI Connection Error**
         
@@ -430,6 +898,7 @@ Technical details: \`${errorMessage}\``,
       setMessages(prev => [...prev, errorChatMsg]);
     } finally {
       setIsThinking(false);
+      setUploadedFile(null);
     }
   };
 
@@ -439,7 +908,7 @@ Technical details: \`${errorMessage}\``,
       await fetch('/api/chats/clear', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId })
+        body: JSON.stringify({ sessionId: currentSessionId })
       });
       setMessages([]);
       setCompletedStreams({});
@@ -456,7 +925,7 @@ Technical details: \`${errorMessage}\``,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           idea: userIdea,
-          sessionId
+          sessionId: currentSessionId
         })
       });
       const data = await res.json();
@@ -473,123 +942,214 @@ Technical details: \`${errorMessage}\``,
   };
 
   return (
-    <div id="home_core_pane" className="flex flex-col h-[calc(100vh-100px)] lg:h-[calc(100vh-40px)] w-full max-w-4xl mx-auto px-4 lg:px-6 py-2 relative">
+    <div id="home_core_pane" className="flex flex-row h-[calc(100vh-100px)] lg:h-[calc(100vh-40px)] w-full relative text-slate-100 overflow-hidden bg-slate-950/20 rounded-2xl border border-slate-900">
       
-      {/* Real World Mode SaaS Gateway & Authorization Panel */}
-      <div className="w-full bg-slate-900/40 border border-slate-900 rounded-xl p-3 mb-4 shrink-0 flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-xl animate-[fadeIn_0.3s_ease] relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-emerald-500/5 to-transparent pointer-events-none" />
-        
-        {/* User Auth Section */}
-        <div className="flex items-center gap-2.5 w-full md:w-auto">
-          <div className="w-9 h-9 rounded-full bg-slate-800/80 border border-slate-700/50 flex items-center justify-center text-slate-300">
-            <User className="w-4.5 h-4.5" />
+      {/* 1. Left Sidebar System */}
+      {isSidebarOpen && (
+        <div id="left_sidebar_panel" className="w-64 bg-slate-950/95 border-r border-slate-900/80 p-4 flex flex-col shrink-0 h-full relative z-10 transition-all duration-300">
+          {/* Sidebar header */}
+          <div className="flex items-center justify-between mb-4 shrink-0">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono flex items-center gap-1.5">
+              <MessageSquare className="w-3.5 h-3.5" /> Mamta Sessions
+            </span>
+            <button 
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-1 rounded-md hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition-all cursor-pointer block md:hidden"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-200">{isLoggedIn ? userEmail : "Guest Mode"}</span>
-              <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${isLoggedIn ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
-                {isLoggedIn ? 'Verified' : 'Unauthenticated'}
+
+          {/* + New Chat Button */}
+          <button 
+            onClick={handleNewChat}
+            className="w-full mb-4 py-2 px-3 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer hover:scale-[1.01]"
+          >
+            <Plus className="w-4 h-4" /> New Chat
+          </button>
+
+          {/* Sessions List */}
+          <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+            {sessions.map((s) => {
+              const isActive = currentSessionId === s.id;
+              return (
+                <div
+                  key={s.id}
+                  onClick={() => setCurrentSessionId(s.id)}
+                  className={`group p-2.5 rounded-lg cursor-pointer flex items-center justify-between gap-2 text-xs font-medium transition-all ${
+                    isActive 
+                      ? 'bg-slate-900 border border-slate-800 text-emerald-400 shadow-inner' 
+                      : 'hover:bg-slate-900/60 text-slate-300 hover:text-slate-100'
+                  }`}
+                >
+                  <span className="truncate flex-1 pr-1">{s.title}</span>
+                  
+                  {/* Delete session button */}
+                  <button
+                    onClick={(e) => handleDeleteSession(s.id, e)}
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-rose-400 transition-all cursor-pointer shrink-0"
+                    title="Delete Chat"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Bottom quick meta */}
+          <div className="pt-3 border-t border-slate-900/80 shrink-0 text-[10px] font-mono text-slate-500">
+            <span>Created by Mamta Pro UI v10</span>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Middle Main Chat Area */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden p-3 lg:p-4 relative">
+        
+        {/* Real World Mode SaaS Gateway & Authorization Panel */}
+        <div className="w-full bg-slate-900/40 border border-slate-900 rounded-xl p-3 mb-4 shrink-0 flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-xl animate-[fadeIn_0.3s_ease] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-emerald-500/5 to-transparent pointer-events-none" />
+          
+          {/* User Auth Section */}
+          <div className="flex items-center gap-2.5 w-full md:w-auto">
+            <div className="w-9 h-9 rounded-full bg-slate-800/80 border border-slate-700/50 flex items-center justify-center text-slate-300">
+              <User className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-200">{isLoggedIn ? userEmail : "Guest Mode"}</span>
+                <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${isLoggedIn ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                  {isLoggedIn ? 'Verified' : 'Unauthenticated'}
+                </span>
+              </div>
+              <button 
+                onClick={isLoggedIn ? handleLogout : handleLogin}
+                className="text-[10px] text-slate-400 hover:text-slate-200 underline mt-0.5 text-left flex items-center gap-1 cursor-pointer"
+              >
+                {isLoggedIn ? (
+                  <>
+                    <LogOut className="w-3 h-3 text-rose-400" /> Log Out
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-3 h-3 text-emerald-400" /> Log In with Google Auth
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Subscription state bar */}
+          <div className="flex-1 w-full md:max-w-xs bg-slate-950/60 rounded-lg p-2 border border-slate-900/50">
+            <div className="flex justify-between text-[10px] font-mono text-slate-400">
+              <span>Usage Limit:</span>
+              <span className="font-semibold text-slate-200">
+                {subscriptionMetrics.usage} / {subscriptionMetrics.limit === null || subscriptionMetrics.limit === Infinity ? 'Unlimited' : subscriptionMetrics.limit}
               </span>
             </div>
-            <button 
-              onClick={isLoggedIn ? handleLogout : handleLogin}
-              className="text-[10px] text-slate-400 hover:text-slate-200 underline mt-0.5 text-left flex items-center gap-1 cursor-pointer"
+            
+            {/* Progress bar */}
+            <div className="w-full bg-slate-900 h-1.5 rounded-full mt-1.5 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-300"
+                style={{ 
+                  width: `${subscriptionMetrics.limit === Infinity || subscriptionMetrics.limit === null ? 0 : Math.min(100, (subscriptionMetrics.usage / subscriptionMetrics.limit) * 100)}%` 
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Upgrade Call to Action */}
+          <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto justify-end">
+            <div className="text-right hidden sm:block">
+              <p className="text-[10px] text-slate-400 font-mono">Current plan:</p>
+              <p className="text-xs font-bold text-emerald-400">{subscriptionMetrics.planName}</p>
+            </div>
+            <button
+              onClick={() => setShowUpgradeModal(true)}
+              className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/10 transition-all duration-200 hover:scale-[1.02]"
             >
-              {isLoggedIn ? (
-                <>
-                  <LogOut className="w-3 h-3 text-rose-400" /> Log Out
-                </>
-              ) : (
-                <>
-                  <LogIn className="w-3 h-3 text-emerald-400" /> Log In with Google Auth
-                </>
+              <Zap className="w-3.5 h-3.5 fill-current" />
+              <span>Upgrade Plan</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Minimal Navbar Header & Control center */}
+        <div className="w-full flex items-center justify-between border-b border-slate-900/60 pb-3 mb-2 shrink-0 gap-3">
+          <div className="flex items-center gap-2">
+            {!isSidebarOpen && (
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 transition-all cursor-pointer mr-1"
+                title="Show Sessions"
+              >
+                <Menu className="w-4 h-4" />
+              </button>
+            )}
+            
+            <div className="relative flex items-center justify-center w-6 h-6 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+              <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+            </div>
+            
+            <div className="flex flex-col">
+              <h2 className="text-xs font-bold tracking-wider text-slate-100 uppercase font-mono flex items-center gap-1.5">
+                Mamta UI Pro Max
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-md uppercase font-bold tracking-wider font-mono border transition-all duration-300 ${isAutoActive ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30 animate-pulse' : 'text-slate-400 bg-slate-500/10 border-slate-500/20'}`}>
+                  {isAutoActive ? 'autonomous action' : 'standby'}
+                </span>
+              </h2>
+              {activeTopic && (
+                <div className="flex items-center gap-1.5 text-[10px] font-mono font-medium text-emerald-400/90 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Topic: {activeTopic}</span>
+                </div>
               )}
-            </button>
-          </div>
-        </div>
-
-        {/* Subscription state bar */}
-        <div className="flex-1 w-full md:max-w-xs bg-slate-950/60 rounded-lg p-2 border border-slate-900/50">
-          <div className="flex justify-between text-[10px] font-mono text-slate-400">
-            <span>Usage Limit:</span>
-            <span className="font-semibold text-slate-200">
-              {subscriptionMetrics.usage} / {subscriptionMetrics.limit === null || subscriptionMetrics.limit === Infinity ? 'Unlimited' : subscriptionMetrics.limit}
-            </span>
-          </div>
-          
-          {/* Progress bar */}
-          <div className="w-full bg-slate-900 h-1.5 rounded-full mt-1.5 overflow-hidden">
-            <div 
-              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-300"
-              style={{ 
-                width: `${subscriptionMetrics.limit === Infinity || subscriptionMetrics.limit === null ? 0 : Math.min(100, (subscriptionMetrics.usage / subscriptionMetrics.limit) * 100)}%` 
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Upgrade Call to Action */}
-        <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto justify-end">
-          <div className="text-right hidden sm:block">
-            <p className="text-[10px] text-slate-400 font-mono">Current plan:</p>
-            <p className="text-xs font-bold text-emerald-400">{subscriptionMetrics.planName}</p>
-          </div>
-          <button
-            onClick={() => setShowUpgradeModal(true)}
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/10 transition-all duration-200 hover:scale-[1.02]"
-          >
-            <Zap className="w-3.5 h-3.5 fill-current" />
-            <span>Upgrade Plan</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Phase 1: Minimal Navbar Header & V10 Autonomous Control Center */}
-      <div className="w-full flex flex-col md:flex-row md:items-center justify-between border-b border-slate-900/60 pb-3 mb-2 shrink-0 gap-3">
-        <div className="flex items-center gap-2">
-          <div className="relative flex items-center justify-center w-6 h-6 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-            <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-          </div>
-          <div>
-            <h2 className="text-xs font-bold tracking-wider text-slate-100 uppercase font-mono flex items-center gap-1.5">
-              Mamta AI V10
-              <span className={`text-[9px] px-1.5 py-0.5 rounded-md uppercase font-bold tracking-wider font-mono border transition-all duration-300 ${isAutoActive ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30 animate-pulse' : 'text-slate-400 bg-slate-500/10 border-slate-500/20'}`}>
-                {isAutoActive ? 'autonomous action' : 'standby'}
-              </span>
-            </h2>
-          </div>
-        </div>
-
-        {/* Dynamic Live Loop Logs Status bar */}
-        <div className="flex items-center gap-3">
-          <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1.5 bg-slate-900/50 border border-slate-900 px-2 py-1 rounded-md">
-            <span className={`w-1.5 h-1.5 rounded-full ${isAutoActive ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
-            <span className="text-slate-300 truncate max-w-[200px]">{autoStatus}</span>
+            </div>
           </div>
 
-          <button
-            onClick={toggleAutonomousMode}
-            className={`px-2.5 py-1 rounded-md border font-mono text-[10px] uppercase font-bold tracking-wider transition-all duration-300 cursor-pointer ${
-              isAutoActive 
-                ? 'bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400' 
-                : 'bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/30 text-indigo-400'
-            }`}
-          >
-            {isAutoActive ? 'Stop Auto' : 'Start Auto'}
-          </button>
-          
-          {messages.length > 0 && (
-            <button 
-              id="clear_chat_history_btn"
-              onClick={handleClearHistory}
-              className="p-1.5 rounded-lg bg-slate-900/40 hover:bg-slate-900 border border-slate-900 hover:border-slate-800 text-slate-400 hover:text-slate-200 transition-all cursor-pointer flex items-center gap-1.5 text-[10px]"
+          <div className="flex items-center gap-2">
+            {/* Autonomous system status */}
+            <div className="hidden sm:flex items-center gap-1.5 bg-slate-900/40 border border-slate-900 px-2 py-1 rounded-lg">
+              <span className={`w-1.5 h-1.5 rounded-full ${isAutoActive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+              <span className="text-[10px] font-mono text-slate-300 truncate max-w-[120px]">{autoStatus}</span>
+            </div>
+
+            <button
+              onClick={toggleAutonomousMode}
+              className={`px-2.5 py-1 rounded-md border font-mono text-[10px] uppercase font-bold tracking-wider transition-all duration-300 cursor-pointer ${
+                isAutoActive 
+                  ? 'bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400' 
+                  : 'bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/30 text-indigo-400'
+              }`}
             >
-              <Trash2 className="w-3.5 h-3.5 text-rose-500/80" />
-              <span>Clear History</span>
+              {isAutoActive ? 'Stop Auto' : 'Start Auto'}
             </button>
-          )}
+
+            {messages.length > 0 && (
+              <button 
+                onClick={handleClearHistory}
+                className="p-1.5 rounded-lg bg-slate-900 border border-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
+                title="Clear History"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+
+            <button
+              onClick={() => setIsMemoryOpen(!isMemoryOpen)}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                isMemoryOpen 
+                  ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400' 
+                  : 'bg-slate-900 border-slate-900/80 text-slate-400 hover:text-slate-200'
+              }`}
+              title="Toggle Memory Profile"
+            >
+              <Brain className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </div>
 
       {/* Phase 1 & 8: Conversation Space & Smooth Mobile Scroll */}
       <div className="flex-1 w-full overflow-y-auto space-y-6 custom-scrollbar scroll-smooth pr-1 pb-24">
@@ -672,6 +1232,31 @@ Technical details: \`${errorMessage}\``,
                   )}
                 </div>
 
+                {isAI && (
+                  <div className="flex items-center gap-1.5 px-1 py-0.5 self-start animate-fade-in">
+                    <button
+                      onClick={() => handleSpeak(msg.content, msg.id)}
+                      className={`text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded-lg transition-all hover:bg-slate-900 border border-transparent cursor-pointer ${
+                        playingMsgId === msg.id 
+                          ? 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20 font-bold' 
+                          : 'text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      {playingMsgId === msg.id ? (
+                        <>
+                          <Volume2 className="w-3 h-3 animate-pulse" />
+                          <span>Stop Audio</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3 h-3" />
+                          <span>Listen (Mamta Voice)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
                 {/* Inline Action Card if a Master Plan is referenced */}
                 {isAI && showWorkspaceButton && hasPlanKeyword && !isExecutionBlockMsg && (
                   <div className="border border-emerald-500/10 bg-emerald-500/5 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-4 animate-[fadeIn_0.3s_ease] w-full max-w-xl">
@@ -713,6 +1298,21 @@ Technical details: \`${errorMessage}\``,
                       <ArrowRight className="w-3.5 h-3.5" />
                       <span>Open Workspace</span>
                     </button>
+                  </div>
+                )}
+
+                {/* Dynamic Follow-up AI Suggestion Chips (Real ChatGPT style) */}
+                {isAI && idx === messages.length - 1 && !isThinking && (
+                  <div className="flex flex-wrap gap-2 pt-2 animate-[fadeIn_0.3s_ease]">
+                    {generateFollowups(messages[idx - 1]?.content || msg.content).map((chip, cIdx) => (
+                      <button
+                        key={cIdx}
+                        onClick={() => handleSendMessage(chip.trim())}
+                        className="px-3 py-1.5 text-[10px] font-medium text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/15 hover:border-emerald-500/30 rounded-xl transition-all duration-200 cursor-pointer hover:scale-[1.02] flex items-center gap-1"
+                      >
+                        <span>{chip}</span>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -816,11 +1416,13 @@ Technical details: \`${errorMessage}\``,
             <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
               <Bot className="w-4 h-4 animate-pulse" />
             </div>
-            <div className="p-3 px-4 rounded-2xl bg-slate-900/20 border border-slate-900/40 text-slate-400 flex items-center gap-1.5">
-              <span className="text-[10px] tracking-wider text-slate-500 uppercase font-mono animate-pulse mr-1">Thinking</span>
-              <span className="w-1.5 h-1.5 bg-emerald-400/80 rounded-full animate-[bounce_1.4s_infinite_0s]" />
-              <span className="w-1.5 h-1.5 bg-emerald-400/80 rounded-full animate-[bounce_1.4s_infinite_0.2s]" />
-              <span className="w-1.5 h-1.5 bg-emerald-400/80 rounded-full animate-[bounce_1.4s_infinite_0.4s]" />
+            <div className="p-3.5 px-4.5 rounded-2xl bg-slate-900/30 border border-slate-900 text-slate-300 flex flex-col space-y-1 max-w-[85%]">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-medium text-emerald-400 animate-pulse">{thinkingStatusText}</span>
+                <span className="w-1.5 h-1.5 bg-emerald-400/80 rounded-full animate-[bounce_1.4s_infinite_0s]" />
+                <span className="w-1.5 h-1.5 bg-emerald-400/80 rounded-full animate-[bounce_1.4s_infinite_0.2s]" />
+                <span className="w-1.5 h-1.5 bg-emerald-400/80 rounded-full animate-[bounce_1.4s_infinite_0.4s]" />
+              </div>
             </div>
           </div>
         ) : null}
@@ -830,6 +1432,94 @@ Technical details: \`${errorMessage}\``,
 
       {/* Phase 1 & 8: Sticky Bottom Input Bar with zero viewport issues */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent pt-4 pb-4 px-4 lg:px-6 shrink-0 z-20">
+        
+        {/* Attachment Pill and Controls Toolbar */}
+        <div className="max-w-3xl mx-auto flex flex-col gap-2 mb-2 bg-slate-950/40 p-2.5 rounded-2xl border border-slate-900/50 backdrop-blur-sm">
+          {uploadedFile && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 self-start animate-fade-in">
+              {uploadedFile.type.startsWith('image/') ? (
+                <ImageIcon className="w-3.5 h-3.5" />
+              ) : (
+                <FileText className="w-3.5 h-3.5" />
+              )}
+              <span className="font-medium max-w-xs truncate">{uploadedFile.name}</span>
+              <button
+                type="button"
+                onClick={() => setUploadedFile(null)}
+                className="ml-1 text-slate-400 hover:text-emerald-300 transition-colors p-0.5 rounded hover:bg-emerald-500/15 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-900/40 pt-2 pb-1">
+            <div className="flex items-center gap-1.5">
+              {/* Paperclip File Upload */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf, .txt, .md, .js, .ts, .json, image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1 text-[11px] font-medium cursor-pointer"
+                title="Attach Files (PDF, Image, Text, JS/TS)"
+              >
+                {isUploading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                ) : (
+                  <Paperclip className="w-3.5 h-3.5" />
+                )}
+                <span>{isUploading ? "Reading..." : "Upload File"}</span>
+              </button>
+
+              {/* Live Web Search Toggle */}
+              <button
+                type="button"
+                onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+                className={`p-1.5 rounded-lg border transition-all flex items-center gap-1 text-[11px] font-medium cursor-pointer ${
+                  webSearchEnabled
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-semibold"
+                    : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                }`}
+                title="Toggle Live Web Search (DuckDuckGo + Wikipedia)"
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span>Search Web</span>
+              </button>
+
+              {/* Auto Speak Toggle */}
+              <button
+                type="button"
+                onClick={() => setAutoSpeakEnabled(!autoSpeakEnabled)}
+                className={`p-1.5 rounded-lg border transition-all flex items-center gap-1 text-[11px] font-medium cursor-pointer ${
+                  autoSpeakEnabled
+                    ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-400 font-semibold"
+                    : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                }`}
+                title="Auto-speak AI responses using cloned voice synthesizer"
+              >
+                {autoSpeakEnabled ? (
+                  <Volume2 className="w-3.5 h-3.5 animate-pulse" />
+                ) : (
+                  <VolumeX className="w-3.5 h-3.5" />
+                )}
+                <span>Auto-Speak</span>
+              </button>
+            </div>
+
+            <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Mamta Supermode Active</span>
+            </div>
+          </div>
+        </div>
+
         <form 
           onSubmit={(e) => {
             e.preventDefault();
@@ -842,14 +1532,34 @@ Technical details: \`${errorMessage}\``,
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask me anything... (e.g., 'namaste mamta! prepare a simple resume app plan')"
-            className="w-full bg-slate-900/70 border border-slate-900 hover:border-slate-800 focus:border-emerald-500/50 rounded-2xl pl-4 pr-14 py-3.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 shadow-2xl transition-all duration-300"
+            placeholder={
+              isListening 
+                ? "Listening... Speak now!" 
+                : "Ask me anything... (e.g., 'What is React Hooks?' or upload files)"
+            }
+            className={`w-full bg-slate-900/70 border rounded-2xl pl-4 pr-24 py-3.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/20 shadow-2xl transition-all duration-300 ${
+              isListening ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/10" : "border-slate-900 hover:border-slate-800 focus:border-emerald-500/50"
+            }`}
           />
           <div className="absolute right-2 top-2 flex items-center gap-1.5">
-            <span className="hidden sm:flex items-center gap-0.5 text-[8.5px] font-mono text-slate-600 px-1.5 py-1 bg-slate-950/80 border border-slate-900 rounded">
-              <span>Enter</span>
-              <CornerDownLeft className="w-2.5 h-2.5 text-slate-500" />
-            </span>
+            {/* Mic Input Trigger */}
+            <button
+              type="button"
+              onClick={startListening}
+              className={`p-2 rounded-xl transition-all duration-200 flex items-center justify-center cursor-pointer ${
+                isListening 
+                  ? "bg-rose-600 text-white animate-bounce" 
+                  : "bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-slate-200"
+              }`}
+              title="Speak to Mamta AI"
+            >
+              {isListening ? (
+                <MicOff className="w-3.5 h-3.5 animate-[ping_1.5s_infinite]" />
+              ) : (
+                <Mic className="w-3.5 h-3.5" />
+              )}
+            </button>
+
             <button
               id="home_chat_send_btn"
               type="submit"
@@ -861,9 +1571,87 @@ Technical details: \`${errorMessage}\``,
           </div>
         </form>
         <p className="text-[9px] text-slate-600 text-center mt-2 font-mono">
-          MAMTA AI can generate plans, decompose items, and sync securely with Firestore.
+          MAMTA AI can generate plans, run code sandbox, perform automated web search and voice synthesis.
         </p>
       </div>
+
+    </div>
+
+      {/* 3. Right Memory Profile Panel */}
+      {isMemoryOpen && (
+        <div id="right_memory_panel" className="w-72 bg-slate-950/95 border-l border-slate-900/80 p-4 flex flex-col shrink-0 h-full relative z-10 transition-all duration-300">
+          {/* Heading */}
+          <div className="flex items-center justify-between mb-3 shrink-0">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono flex items-center gap-1.5">
+              <Brain className="w-3.5 h-3.5 text-indigo-400" /> Advanced Memory
+            </span>
+            <button 
+              onClick={() => setIsMemoryOpen(false)}
+              className="p-1 rounded-md hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition-all cursor-pointer block lg:hidden"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          
+          <p className="text-[10px] text-slate-500 leading-relaxed mb-4 font-mono">
+            Dynamic context remembered during discussions to personalize suggestions & generation.
+          </p>
+
+          {/* Memory Add Input */}
+          <div className="mb-4 shrink-0 flex items-center gap-1.5 bg-slate-900/80 border border-slate-800 rounded-lg p-1">
+            <input 
+              type="text"
+              placeholder="Add custom constraint..."
+              value={newMemoryText}
+              onChange={(e) => setNewMemoryText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddMemory()}
+              className="w-full bg-transparent border-0 outline-none focus:ring-0 text-xs text-slate-200 placeholder:text-slate-600 px-1.5 py-1"
+            />
+            <button 
+              onClick={handleAddMemory}
+              className="px-2 py-1 bg-indigo-500 hover:bg-indigo-600 text-slate-950 rounded-md text-[10px] font-bold cursor-pointer transition-all"
+            >
+              Add
+            </button>
+          </div>
+
+          {/* Memories List */}
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+            {memory.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                <History className="w-6 h-6 text-slate-700 mb-1.5 stroke-1" />
+                <p className="text-[10px] text-slate-600 font-mono">No active memories. Add or type messages to train.</p>
+              </div>
+            ) : (
+              memory.map((item, idx) => (
+                <div 
+                  key={idx}
+                  className="group p-2 bg-slate-900/40 border border-slate-900/80 rounded-lg flex items-start justify-between gap-1.5 text-[11px] text-slate-300 leading-normal"
+                >
+                  <span className="flex-1 font-sans">{item}</span>
+                  <button
+                    onClick={() => handleDeleteMemory(idx)}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-800 text-slate-500 hover:text-rose-400 transition-all cursor-pointer shrink-0"
+                    title="Forget Memory"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Clear All Memories button */}
+          {memory.length > 0 && (
+            <button 
+              onClick={handleClearAllMemories}
+              className="w-full mt-4 py-1.5 px-3 bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/20 hover:border-rose-500/30 text-rose-400 rounded-lg text-[10px] font-mono tracking-wide transition-all cursor-pointer"
+            >
+              Clear All Memories
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Real World Mode: Premium SaaS Billing & Upgrade Center Modal */}
       <AnimatePresence>

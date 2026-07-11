@@ -13,7 +13,19 @@ import {
   Sparkles,
   Rocket,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  User,
+  Mail,
+  Shield,
+  Zap,
+  LogIn,
+  LogOut,
+  Activity,
+  Check,
+  ExternalLink,
+  Globe,
+  Database,
+  Code
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -35,6 +47,53 @@ export default function App() {
     return saved !== 'false';
   });
 
+  // Hoisted User Auth and Subscription States (Global Home of the User)
+  const [userEmail, setUserEmail] = useState<string>(() => {
+    return localStorage.getItem('user_email') || 'rajveersinghm675@gmail.com';
+  });
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return localStorage.getItem('is_logged_in') !== 'false';
+  });
+  const [subscriptionMetrics, setSubscriptionMetrics] = useState<any>({
+    planName: 'Free Tier',
+    usage: 0,
+    limit: 10,
+    remaining: 10,
+    pricing: 'Free'
+  });
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+  const [isProfileHubOpen, setIsProfileHubOpen] = useState<boolean>(false);
+  const [bilingualLanguage, setBilingualLanguage] = useState<'en_hi' | 'hi'>('en_hi');
+
+  const fetchSubscriptionMetrics = async () => {
+    if (!sessionId) return;
+    try {
+      const res = await fetch(`/api/payments/dashboard?sessionId=${sessionId}`);
+      const data = await res.json();
+      if (data && !data.error) {
+        setSubscriptionMetrics(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch subscription details in App:', err);
+    }
+  };
+
+  const handleLogin = () => {
+    const simulatedEmail = prompt("Enter your email address to log in securely:", userEmail);
+    if (simulatedEmail && simulatedEmail.trim()) {
+      const trimmed = simulatedEmail.trim();
+      setUserEmail(trimmed);
+      setIsLoggedIn(true);
+      localStorage.setItem('user_email', trimmed);
+      localStorage.setItem('is_logged_in', 'true');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    localStorage.setItem('is_logged_in', 'false');
+  };
+
   const handleToggleSidebar = (val: boolean) => {
     setDesktopSidebarOpen(val);
     localStorage.setItem('desktop_sidebar_open', String(val));
@@ -49,6 +108,12 @@ export default function App() {
     }
     setSessionId(sid);
   }, []);
+
+  useEffect(() => {
+    if (sessionId) {
+      fetchSubscriptionMetrics();
+    }
+  }, [sessionId]);
 
   const handleSelectPlan = (planId: string) => {
     setSelectedPlanId(planId);
@@ -167,6 +232,31 @@ export default function App() {
 
           </nav>
 
+          {/* Permanent User Profile Section (The User's Home Hub) */}
+          <div className="border-t border-slate-900 pt-3 pb-2 mb-2">
+            <button
+              onClick={() => setIsProfileHubOpen(true)}
+              className="w-full flex items-center gap-2.5 p-2 rounded-xl bg-slate-950/40 hover:bg-slate-900 border border-slate-900/60 hover:border-slate-800 transition-all text-left group cursor-pointer"
+            >
+              <div className="relative shrink-0">
+                <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700/50 flex items-center justify-center text-slate-300 group-hover:border-emerald-500/50 transition-colors">
+                  <User className="w-4 h-4 text-emerald-400" />
+                </div>
+                {isLoggedIn && (
+                  <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-slate-950 animate-pulse" />
+                )}
+              </div>
+              <div className="truncate flex-1">
+                <p className="text-[10px] font-bold text-slate-200 truncate leading-tight group-hover:text-emerald-400 transition-colors">
+                  {isLoggedIn ? userEmail.split('@')[0] : 'Guest User'}
+                </p>
+                <p className="text-[8px] font-mono text-slate-500 leading-none mt-0.5 truncate uppercase tracking-wider">
+                  {isLoggedIn ? 'Verified Core' : 'Guest Account'}
+                </p>
+              </div>
+            </button>
+          </div>
+
           {/* Sidebar Footer details */}
           <div className="border-t border-slate-900 pt-3 text-[9px] text-slate-600 font-mono space-y-1">
             <div className="flex items-center justify-between">
@@ -197,12 +287,21 @@ export default function App() {
           <span className="text-sm font-bold tracking-wider font-display text-slate-100 uppercase">MAMTA AI</span>
         </div>
 
-        <button 
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-1.5 rounded bg-slate-900 text-slate-400 hover:text-slate-200"
-        >
-          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsProfileHubOpen(true)}
+            className="p-1.5 rounded-lg bg-slate-900 text-slate-300 hover:text-emerald-400 border border-slate-800 transition-all cursor-pointer flex items-center justify-center shrink-0"
+            title="Open Profile Hub"
+          >
+            <User className="w-4 h-4 text-emerald-400" />
+          </button>
+          <button 
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-1.5 rounded bg-slate-900 text-slate-400 hover:text-slate-200"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* MOBILE NAVIGATION SIDEBAR SLIDEOVER */}
@@ -266,6 +365,26 @@ export default function App() {
                 <span>SafeDrop Vault</span>
               </button>
             </nav>
+
+            {/* Mobile Profile Trigger Footer */}
+            <div className="border-t border-slate-900 pt-4 mt-auto">
+              <button
+                onClick={() => { setIsProfileHubOpen(true); setMobileMenuOpen(false); }}
+                className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-left cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
+                  <User className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-200 leading-tight">
+                    {isLoggedIn ? userEmail : 'Guest User'}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-none">
+                    {isLoggedIn ? 'Manage Profile Hub' : 'Click to Log In'}
+                  </p>
+                </div>
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -303,9 +422,20 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 text-[10px] text-slate-500 font-mono">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Core Operational</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 text-[10px] text-slate-500 font-mono border-r border-slate-800/80 pr-3">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Core Operational</span>
+              </div>
+              <button
+                onClick={() => setIsProfileHubOpen(true)}
+                className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-950/60 hover:bg-slate-800 border border-slate-850 hover:border-slate-800 transition-all cursor-pointer text-xs font-semibold text-slate-300 hover:text-emerald-400 group"
+              >
+                <div className="w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-emerald-500/10 group-hover:text-emerald-400 transition-all">
+                  <User className="w-2.5 h-2.5" />
+                </div>
+                <span>Profile Hub</span>
+              </button>
             </div>
           </div>
         )}
@@ -325,6 +455,15 @@ export default function App() {
                   sessionId={sessionId} 
                   onSelectPlan={handleSelectPlan}
                   setActiveTab={setActiveTab}
+                  isLoggedIn={isLoggedIn}
+                  userEmail={userEmail}
+                  setIsLoggedIn={setIsLoggedIn}
+                  setUserEmail={setUserEmail}
+                  subscriptionMetrics={subscriptionMetrics}
+                  setSubscriptionMetrics={setSubscriptionMetrics}
+                  showUpgradeModal={showUpgradeModal}
+                  setShowUpgradeModal={setShowUpgradeModal}
+                  fetchSubscriptionMetrics={fetchSubscriptionMetrics}
                 />
               )}
               {activeTab === 'workspace' && (
@@ -348,6 +487,203 @@ export default function App() {
         </ErrorBoundary>
 
       </main>
+
+      {/* 3. MAMTA PROFILE & ACCOUNT HUB MODAL (The User's Core Home) */}
+      <AnimatePresence>
+        {isProfileHubOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsProfileHubOpen(false)}
+              className="absolute inset-0 bg-slate-950/85 backdrop-blur-md"
+            />
+
+            <motion.div 
+              initial={{ scale: 0.95, y: 15, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 15, opacity: 0 }}
+              className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl overflow-hidden relative z-10 shadow-2xl flex flex-col text-slate-100 font-sans"
+            >
+              {/* Header with neon styling */}
+              <div className="px-6 py-5 border-b border-slate-800/80 flex items-center justify-between bg-gradient-to-r from-slate-900 to-slate-900/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    <User className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-100 tracking-tight">User Account Hub</h3>
+                    <p className="text-[10px] text-slate-400 font-mono uppercase tracking-wider mt-0.5">MAMTA Core Dashboard</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsProfileHubOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
+                
+                {/* 1. Profile Core Info */}
+                <div className="p-5 bg-gradient-to-r from-slate-950/80 to-slate-950/40 border border-slate-800/60 rounded-2xl flex flex-col sm:flex-row items-center gap-5 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-500/5 to-transparent pointer-events-none" />
+                  
+                  {/* Glowing Animated Avatar */}
+                  <div className="relative">
+                    <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-emerald-500/30 flex items-center justify-center text-slate-300 relative z-10 overflow-hidden shadow-lg shadow-emerald-500/5">
+                      <User className="w-7 h-7 text-emerald-400" />
+                    </div>
+                    <div className="absolute inset-0 bg-emerald-500/10 blur-xl rounded-full animate-pulse" />
+                    {isLoggedIn && (
+                      <span className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900 z-20" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 text-center sm:text-left space-y-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                      <span className="text-sm font-bold text-slate-100">{isLoggedIn ? userEmail : "Guest Session"}</span>
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider self-center ${isLoggedIn ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-slate-800 border border-slate-700 text-slate-500'}`}>
+                        {isLoggedIn ? 'Verified Core Member' : 'Guest Core'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-mono">
+                      Session ID: <span className="text-indigo-400">{sessionId}</span>
+                    </p>
+                    <p className="text-[11px] text-slate-400 leading-normal">
+                      Welcome back! This is your autonomous command center. Your chats, workspace configurations, and active plans are preserved securely here.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. Bandwidth & Active Limits Progress */}
+                <div className="p-5 bg-slate-950/30 border border-slate-800/60 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-emerald-400" /> Subscription Bandwidth
+                    </span>
+                    <span className="text-xs font-bold text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                      {subscriptionMetrics.planName}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs font-mono">
+                      <span className="text-slate-400">Monthly Prompt Token Limits:</span>
+                      <span className="font-semibold text-slate-200">
+                        {subscriptionMetrics.usage} / {subscriptionMetrics.limit === null || subscriptionMetrics.limit === Infinity ? 'Unlimited' : subscriptionMetrics.limit}
+                      </span>
+                    </div>
+                    
+                    {/* Progress slider bar */}
+                    <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                      <div 
+                        className="bg-gradient-to-r from-emerald-500 via-teal-400 to-indigo-500 h-full rounded-full transition-all duration-300"
+                        style={{ 
+                          width: `${subscriptionMetrics.limit === Infinity || subscriptionMetrics.limit === null ? 0 : Math.min(100, (subscriptionMetrics.usage / subscriptionMetrics.limit) * 100)}%` 
+                        }}
+                      />
+                    </div>
+                    
+                    <p className="text-[10px] text-slate-500 font-mono text-right leading-none pt-1">
+                      {subscriptionMetrics.limit === Infinity || subscriptionMetrics.limit === null 
+                        ? 'Unlimited access active' 
+                        : `${Math.max(0, subscriptionMetrics.limit - subscriptionMetrics.usage)} API calls remaining in current period`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. Interactive Stats Grid & System Info */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-4 bg-slate-950/20 border border-slate-900 rounded-xl flex flex-col items-center justify-center text-center space-y-1">
+                    <Activity className="w-5 h-5 text-emerald-400" />
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 font-mono">Chat Status</span>
+                    <span className="text-xs font-bold text-slate-200">Connected</span>
+                  </div>
+
+                  <div className="p-4 bg-slate-950/20 border border-slate-900 rounded-xl flex flex-col items-center justify-center text-center space-y-1">
+                    <Database className="w-5 h-5 text-indigo-400" />
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 font-mono">Database Ingress</span>
+                    <span className="text-xs font-bold text-slate-200">Firestore Live</span>
+                  </div>
+
+                  <div className="p-4 bg-slate-950/20 border border-slate-900 rounded-xl flex flex-col items-center justify-center text-center space-y-1">
+                    <Code className="w-5 h-5 text-teal-400" />
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 font-mono">Workspace IDE</span>
+                    <span className="text-xs font-bold text-slate-200">Sandbox Ready</span>
+                  </div>
+                </div>
+
+                {/* 4. Bilingual Settings Control */}
+                <div className="p-4 bg-slate-950/40 border border-slate-900 rounded-xl flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-slate-400" />
+                    <div>
+                      <p className="text-xs font-semibold text-slate-200">Preferred System Language</p>
+                      <p className="text-[10px] text-slate-500 font-mono">Preferred translation core for outputs</p>
+                    </div>
+                  </div>
+                  <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                    <button
+                      onClick={() => setBilingualLanguage('en_hi')}
+                      className={`px-2.5 py-1 text-[10px] font-semibold rounded font-mono uppercase tracking-wider transition-all cursor-pointer ${bilingualLanguage === 'en_hi' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      Bilingual
+                    </button>
+                    <button
+                      onClick={() => setBilingualLanguage('hi')}
+                      className={`px-2.5 py-1 text-[10px] font-semibold rounded font-mono uppercase tracking-wider transition-all cursor-pointer ${bilingualLanguage === 'hi' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      Hindi Only
+                    </button>
+                  </div>
+                </div>
+
+                {/* Footer Controls */}
+                <div className="flex flex-col sm:flex-row justify-between gap-3 pt-4 border-t border-slate-800/60">
+                  {isLoggedIn ? (
+                    <button
+                      onClick={() => { handleLogout(); setIsProfileHubOpen(false); }}
+                      className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Log Out from Core</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { handleLogin(); }}
+                      className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <LogIn className="w-3.5 h-3.5" />
+                      <span>Log In to Secure Profile</span>
+                    </button>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setIsProfileHubOpen(false); setActiveTab('home'); setShowUpgradeModal(true); }}
+                      className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-emerald-500/10 transition-all font-mono"
+                    >
+                      <Zap className="w-3.5 h-3.5 fill-current" />
+                      <span>UPGRADE PLAN</span>
+                    </button>
+                    <button
+                      onClick={() => setIsProfileHubOpen(false)}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium cursor-pointer transition-all"
+                    >
+                      Close Hub
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

@@ -38,7 +38,7 @@ import {
 import { ChatMessage } from '../types';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, addDoc } from 'firebase/firestore';
-import { MamtaBrainReal } from '../brain/MamtaBrainReal';
+import { MamtaBrainReal, isPlanningOrDevelopmentQuery } from '../brain/MamtaBrainReal';
 import { AutonomousLoop } from '../brain/AutonomousLoop';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -51,7 +51,16 @@ import {
 interface HomeViewProps {
   sessionId: string;
   onSelectPlan: (planId: string) => void;
-  setActiveTab: (tab: 'home' | 'workspace' | 'admin' | 'safedrop') => void;
+  setActiveTab: (tab: 'home' | 'workspace' | 'admin' | 'safedrop' | 'launch') => void;
+  isLoggedIn: boolean;
+  userEmail: string;
+  setIsLoggedIn: (isLoggedIn: boolean) => void;
+  setUserEmail: (userEmail: string) => void;
+  subscriptionMetrics: any;
+  setSubscriptionMetrics: React.Dispatch<React.SetStateAction<any>>;
+  showUpgradeModal: boolean;
+  setShowUpgradeModal: (show: boolean) => void;
+  fetchSubscriptionMetrics: () => Promise<void>;
 }
 
 // Custom Markdown text renderer with interactive Node.js Sandboxed Code execution
@@ -228,13 +237,22 @@ const StreamingResponse: React.FC<{ text: string; onComplete?: () => void }> = (
   );
 };
 
-export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: HomeViewProps) {
+export default function HomeView({ 
+  sessionId, 
+  onSelectPlan, 
+  setActiveTab,
+  isLoggedIn,
+  userEmail,
+  setIsLoggedIn,
+  setUserEmail,
+  subscriptionMetrics,
+  setSubscriptionMetrics,
+  showUpgradeModal,
+  setShowUpgradeModal,
+  fetchSubscriptionMetrics
+}: HomeViewProps) {
   const [brain] = useState(() => new MamtaBrainReal());
   
-  // Real World SaaS Subscription & Auth states
-  const [userEmail, setUserEmail] = useState<string>('rajveersinghm675@gmail.com');
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(true); // default logged in
-
   const [currentSessionId, setCurrentSessionId] = useState(sessionId);
   const [sessions, setSessions] = useState<{ id: string; title: string }[]>([]);
   const [memory, setMemory] = useState<string[]>([]);
@@ -278,28 +296,8 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [subscriptionMetrics, setSubscriptionMetrics] = useState<any>({
-    planName: 'Free Tier',
-    usage: 0,
-    limit: 10,
-    remaining: 10,
-    pricing: 'Free'
-  });
-  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
   const [upgradePlanKey, setUpgradePlanKey] = useState<'pro' | 'premium' | null>(null);
   const [isProcessingUpgrade, setIsProcessingUpgrade] = useState<boolean>(false);
-
-  const fetchSubscriptionMetrics = async () => {
-    try {
-      const res = await fetch(`/api/payments/dashboard?sessionId=${currentSessionId}`);
-      const data = await res.json();
-      if (data && !data.error) {
-        setSubscriptionMetrics(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch subscription details:', err);
-    }
-  };
 
   useEffect(() => {
     fetchSubscriptionMetrics();
@@ -309,13 +307,17 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
     // Simulated Google OAuth Flow
     const simulatedEmail = prompt("Enter your email address to log in securely:", userEmail);
     if (simulatedEmail && simulatedEmail.trim()) {
-      setUserEmail(simulatedEmail.trim());
+      const trimmed = simulatedEmail.trim();
+      setUserEmail(trimmed);
       setIsLoggedIn(true);
+      localStorage.setItem('user_email', trimmed);
+      localStorage.setItem('is_logged_in', 'true');
     }
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
+    localStorage.setItem('is_logged_in', 'false');
   };
 
   const handleCreateOrderAndUpgrade = async (planKey: 'pro' | 'premium') => {
@@ -866,6 +868,29 @@ export default function HomeView({ sessionId, onSelectPlan, setActiveTab }: Home
     const trimmedInput = textToSend.trim();
     if (!trimmedInput || isThinking) return;
 
+    // Client-side block for Planning & Development queries exceeding limits
+    const isDev = isPlanningOrDevelopmentQuery(trimmedInput);
+    if (isDev && subscriptionMetrics.limit !== Infinity && subscriptionMetrics.limit !== null && subscriptionMetrics.usage >= subscriptionMetrics.limit) {
+      setInput('');
+      setShowUpgradeModal(true);
+      const limitMsg: ChatMessage = {
+        id: 'limit-' + Date.now(),
+        sessionId: currentSessionId,
+        role: 'model',
+        content: `### ⛔ Development Limit Reached
+        
+You have fully consumed the planning and development limit under your **${subscriptionMetrics.planName}**. 
+
+We have automatically popped up the **SaaS Subscription Upgrade** dashboard so you can securely upgrade your account to continue creating applications, compiling code, and executing sandboxed programs.
+
+*Note: Conversational chats remain **100% free and unlimited**. If you wish to continue chatting or exploring, you can simply close the popup modal.*`,
+        timestamp: new Date().toISOString(),
+        pageSource: 'home'
+      };
+      setMessages(prev => [...prev, limitMsg]);
+      return;
+    }
+
     // Dynamically update session title based on first query
     if (sessions.some(s => s.id === currentSessionId && (s.title.startsWith('New Chat') || s.title === 'Current Active Chat'))) {
       const newTitle = trimmedInput.length > 25 ? trimmedInput.slice(0, 25) + '...' : trimmedInput;
@@ -932,6 +957,10 @@ Execution triggers and builds are only available in the Workspace tab. Please sw
       
       // Update local metrics and subscription state immediately
       setSubscriptionMetrics(result.dashboard);
+
+      if (response && response.includes("Development Limit Reached")) {
+        setShowUpgradeModal(true);
+      }
 
       // Enhance the response with conversational humanness
       if (response) {
@@ -1093,75 +1122,6 @@ Technical details: \`${errorMessage}\``,
 
       {/* 2. Middle Main Chat Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden p-3 lg:p-4 relative">
-        
-        {/* Real World Mode SaaS Gateway & Authorization Panel */}
-        <div className="w-full bg-slate-900/40 border border-slate-900 rounded-xl p-3 mb-4 shrink-0 flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-xl animate-[fadeIn_0.3s_ease] relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-emerald-500/5 to-transparent pointer-events-none" />
-          
-          {/* User Auth Section */}
-          <div className="flex items-center gap-2.5 w-full md:w-auto">
-            <div className="w-9 h-9 rounded-full bg-slate-800/80 border border-slate-700/50 flex items-center justify-center text-slate-300">
-              <User className="w-4.5 h-4.5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-200">{isLoggedIn ? userEmail : "Guest Mode"}</span>
-                <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${isLoggedIn ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
-                  {isLoggedIn ? 'Verified' : 'Unauthenticated'}
-                </span>
-              </div>
-              <button 
-                onClick={isLoggedIn ? handleLogout : handleLogin}
-                className="text-[10px] text-slate-400 hover:text-slate-200 underline mt-0.5 text-left flex items-center gap-1 cursor-pointer"
-              >
-                {isLoggedIn ? (
-                  <>
-                    <LogOut className="w-3 h-3 text-rose-400" /> Log Out
-                  </>
-                ) : (
-                  <>
-                    <LogIn className="w-3 h-3 text-emerald-400" /> Log In with Google Auth
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Subscription state bar */}
-          <div className="flex-1 w-full md:max-w-xs bg-slate-950/60 rounded-lg p-2 border border-slate-900/50">
-            <div className="flex justify-between text-[10px] font-mono text-slate-400">
-              <span>Usage Limit:</span>
-              <span className="font-semibold text-slate-200">
-                {subscriptionMetrics.usage} / {subscriptionMetrics.limit === null || subscriptionMetrics.limit === Infinity ? 'Unlimited' : subscriptionMetrics.limit}
-              </span>
-            </div>
-            
-            {/* Progress bar */}
-            <div className="w-full bg-slate-900 h-1.5 rounded-full mt-1.5 overflow-hidden">
-              <div 
-                className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-300"
-                style={{ 
-                  width: `${subscriptionMetrics.limit === Infinity || subscriptionMetrics.limit === null ? 0 : Math.min(100, (subscriptionMetrics.usage / subscriptionMetrics.limit) * 100)}%` 
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Upgrade Call to Action */}
-          <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto justify-end">
-            <div className="text-right hidden sm:block">
-              <p className="text-[10px] text-slate-400 font-mono">Current plan:</p>
-              <p className="text-xs font-bold text-emerald-400">{subscriptionMetrics.planName}</p>
-            </div>
-            <button
-              onClick={() => setShowUpgradeModal(true)}
-              className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/10 transition-all duration-200 hover:scale-[1.02]"
-            >
-              <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Upgrade Plan</span>
-            </button>
-          </div>
-        </div>
 
         {/* Minimal Navbar Header & Control center */}
         <div className="w-full flex items-center justify-between border-b border-slate-900/60 pb-3 mb-2 shrink-0 gap-3">
@@ -1182,9 +1142,12 @@ Technical details: \`${errorMessage}\``,
             
             <div className="flex flex-col">
               <h2 className="text-xs font-bold tracking-wider text-slate-100 uppercase font-mono flex items-center gap-1.5">
-                Mamta UI Pro Max
+                MAMTA AI
+                <span className="text-[9px] px-1.5 py-0.5 rounded-md font-semibold tracking-wider font-mono border border-indigo-500/20 text-indigo-400 bg-indigo-500/5">
+                  Supermode
+                </span>
                 <span className={`text-[9px] px-1.5 py-0.5 rounded-md uppercase font-bold tracking-wider font-mono border transition-all duration-300 ${isAutoActive ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30 animate-pulse' : 'text-slate-400 bg-slate-500/10 border-slate-500/20'}`}>
-                  {isAutoActive ? 'autonomous action' : 'standby'}
+                  {isAutoActive ? 'autonomous' : 'standby'}
                 </span>
               </h2>
               {activeTopic && (
@@ -1603,53 +1566,46 @@ Technical details: \`${errorMessage}\``,
       {/* Phase 1 & 8: Sticky Bottom Input Bar with zero viewport issues */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent pt-4 pb-4 px-4 lg:px-6 shrink-0 z-20">
         
+        {/* Paperclip File Upload (Hidden Input) */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf, .txt, .md, .js, .ts, .json, image/*"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+
         {/* Attachment Pill and Controls Toolbar */}
-        <div className="max-w-3xl mx-auto flex flex-col gap-2 mb-2 bg-slate-950/40 p-2.5 rounded-2xl border border-slate-900/50 backdrop-blur-sm">
-          {uploadedFile && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 self-start animate-fade-in">
-              {uploadedFile.type.startsWith('image/') ? (
-                <ImageIcon className="w-3.5 h-3.5" />
-              ) : (
-                <FileText className="w-3.5 h-3.5" />
-              )}
-              <span className="font-medium max-w-xs truncate">{uploadedFile.name}</span>
-              <button
-                type="button"
-                onClick={() => setUploadedFile(null)}
-                className="ml-1 text-slate-400 hover:text-emerald-300 transition-colors p-0.5 rounded hover:bg-emerald-500/15 cursor-pointer"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          )}
+        {(uploadedFile || voiceStatus) ? (
+          <div className="max-w-3xl mx-auto flex flex-col gap-2 mb-2 bg-slate-950/40 p-2.5 rounded-2xl border border-slate-900/50 backdrop-blur-sm animate-fade-in">
+            {uploadedFile && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 self-start animate-fade-in">
+                {uploadedFile.type.startsWith('image/') ? (
+                  <ImageIcon className="w-3.5 h-3.5" />
+                ) : (
+                  <FileText className="w-3.5 h-3.5" />
+                )}
+                <span className="font-medium max-w-xs truncate">{uploadedFile.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setUploadedFile(null)}
+                  className="ml-1 text-slate-400 hover:text-emerald-300 transition-colors p-0.5 rounded hover:bg-emerald-500/15 cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
 
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-900/40 pt-2 pb-1">
-            <div className="flex items-center gap-1.5">
-              {/* Paperclip File Upload */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf, .txt, .md, .js, .ts, .json, image/*"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </div>
-
-            <div className="text-[10px] font-mono flex items-center gap-1.5 transition-all">
-              {voiceStatus ? (
+            {voiceStatus && (
+              <div className="text-[10px] font-mono flex items-center gap-1.5 transition-all self-start animate-fade-in">
                 <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded ${voiceStatus.startsWith('Error') ? 'bg-rose-500/15 text-rose-400 border border-rose-500/20' : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 animate-pulse'}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${voiceStatus.startsWith('Error') ? 'bg-rose-400' : 'bg-emerald-400 animate-ping'}`} />
                   <span>{voiceStatus}</span>
                 </div>
-              ) : (
-                <div className="flex items-center gap-1.5 text-slate-500">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Mamta Supermode Active</span>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-        </div>
+        ) : null}
 
         <form 
           onSubmit={(e) => {
@@ -1829,9 +1785,10 @@ Technical details: \`${errorMessage}\``,
                   type="button"
                   disabled={isProcessingUpgrade}
                   onClick={() => setShowUpgradeModal(false)}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-slate-200 cursor-pointer disabled:opacity-30 transition-all text-xs font-mono font-bold"
+                  className="p-1.5 rounded-lg hover:bg-slate-850 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-500/20 bg-slate-950/40 cursor-pointer disabled:opacity-30 transition-all text-xs flex items-center justify-center shrink-0 w-8 h-8"
+                  title="Close Upgrade Modal"
                 >
-                  ESC
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 

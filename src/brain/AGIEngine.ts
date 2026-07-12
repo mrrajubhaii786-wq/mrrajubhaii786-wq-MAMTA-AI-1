@@ -53,3 +53,14 @@ export async function thinkAndDecide(
     };
   }
 }
+
+export class AGIEngine {
+  async decide(params: { input: string; context?: any; state?: any }): Promise<{ action: string; reason: string }> {
+    const input = params.input || "";
+    const projectState = params.state || params.context || {};
+    const memory = {};
+    const actionObj = await thinkAndDecide(input, projectState, memory);
+    return actionObj;
+  }
+}
+

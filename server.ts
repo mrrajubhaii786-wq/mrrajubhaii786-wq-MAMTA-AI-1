@@ -2798,6 +2798,78 @@ app.post("/deploy-webhook", (req, res) => {
   }
 });
 
+import { runAICycle } from "./src/brain/TaskScheduler";
+import { createBullBoard } from "@bull-board/api";
+import { BullAdapter } from "@bull-board/api/bullAdapter";
+import { ExpressAdapter } from "@bull-board/express";
+import { aiQueue, deadQueue } from "./src/system/QueueManager";
+import jwt from "jsonwebtoken";
+
+const serverAdapter = new ExpressAdapter();
+serverAdapter.setBasePath("/admin/queues");
+
+createBullBoard({
+  queues: [new BullAdapter(aiQueue), new BullAdapter(deadQueue)],
+  serverAdapter: serverAdapter,
+});
+
+function protectAdmin(req: any, res: any, next: any) {
+  const secret = process.env.JWT_SECRET;
+  
+  if (!secret) {
+    console.log("⚠️ [protectAdmin] No JWT_SECRET configured. Allowing access to Admin Queue dashboard.");
+    return next();
+  }
+
+  let token = req.headers.authorization || req.query.token;
+
+  if (typeof token === "string" && token.startsWith("Bearer ")) {
+    token = token.slice(7);
+  }
+
+  if (!token) {
+    return res.status(401).send(`
+      <div style="font-family: sans-serif; text-align: center; margin-top: 100px;">
+        <h1 style="color: #e53e3e;">🔒 Admin Queue Dashboard Protected</h1>
+        <p style="color: #4a5568;">To access, provide a valid JWT via Authorization header or '?token=YOUR_JWT_SECRET' query parameter.</p>
+      </div>
+    `);
+  }
+
+  try {
+    jwt.verify(token, secret);
+    next();
+  } catch {
+    res.status(401).send(`
+      <div style="font-family: sans-serif; text-align: center; margin-top: 100px;">
+        <h1 style="color: #e53e3e;">🔒 Access Denied</h1>
+        <p style="color: #4a5568;">Invalid or expired JWT signature provided.</p>
+      </div>
+    `);
+  }
+}
+
+app.use("/admin/queues", protectAdmin, serverAdapter.getRouter());
+
+// Endpoint to trigger the distributed AI brain cycle
+app.get("/run-ai", async (req, res) => {
+  console.log("📡 [Server] Manual run-ai request received on port 3000");
+  try {
+    const result = await runAICycle();
+    res.json({
+      status: "AI Cycle Triggered successfully on port 3000",
+      result
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Start the AI queue processing worker automatically in the background
+import "./src/system/Worker";
+import "./src/system/DLQWorker";
+
+
 
 import crypto from "crypto";
 

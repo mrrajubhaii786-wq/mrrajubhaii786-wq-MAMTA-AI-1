@@ -1,0 +1,15 @@
+# Dockerfile.worker
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package descriptors first to leverage Docker cache layers
+COPY package*.json ./
+
+RUN npm install --production
+
+# Copy remaining source code
+COPY . .
+
+# Run the worker process
+CMD ["node", "dist/server.cjs"]

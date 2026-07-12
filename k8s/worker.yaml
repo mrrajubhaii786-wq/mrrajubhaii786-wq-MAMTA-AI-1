@@ -1,0 +1,71 @@
+# k8s/worker.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mamta-ai-workers
+  namespace: mamta-ai
+  labels:
+    app: mamta-ai-worker
+    tier: brain-worker
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: mamta-ai-worker
+  template:
+    metadata:
+      labels:
+        app: mamta-ai-worker
+    spec:
+      containers:
+        - name: worker
+          image: gcr.io/mamta-ai-production/worker-swarm:latest
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: mamta-ai-secrets
+                  key: jwt-secret
+            - name: REDIS_URL
+              value: "redis://redis-cluster-ip:6379"
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mamta-ai-secrets
+                  key: gemini-api-key
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mamta-ai-worker-service
+  namespace: mamta-ai
+spec:
+  selector:
+    app: mamta-ai-worker
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+  type: ClusterIP

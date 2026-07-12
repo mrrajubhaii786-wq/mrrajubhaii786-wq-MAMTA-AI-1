@@ -23,11 +23,11 @@ export const createPool = () => {
 const pool = createPool();
 
 pool.on("error", (err) => {
+  if (err && err.message && err.message.includes("Connection terminated unexpectedly")) {
+    console.warn("Database idle client connection terminated unexpectedly (normal pool lifecycle behavior)");
+    return;
+  }
   console.error("Unexpected error on idle SQL pool client:", err);
-  setTimeout(() => {
-    console.log("Attempting database reconnection...");
-    createPool();
-  }, 5000);
 });
 
 pool.on("connect", () => {

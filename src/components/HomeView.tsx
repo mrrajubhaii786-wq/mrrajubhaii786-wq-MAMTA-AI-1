@@ -40,6 +40,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, addDoc } from 'firebase/firestore';
 import { MamtaBrainReal, isPlanningOrDevelopmentQuery } from '../brain/MamtaBrainReal';
 import { AutonomousLoop } from '../brain/AutonomousLoop';
+import { saveProject } from '../db/ProjectStore';
 import { Terminal } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -930,6 +931,15 @@ We have automatically popped up the **SaaS Subscription Upgrade** dashboard so y
         });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
+
+        // Save project context to persistent storage
+        saveProject({
+          id: data.id,
+          input: trimmedInput,
+          files: data.files || [],
+          name: data.title || "Mamta AI Generated Project",
+          created_at: new Date().toISOString()
+        });
 
         // Formulate transition message
         const redirectMsg: ChatMessage = {

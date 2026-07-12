@@ -13,6 +13,8 @@ import { thinkDeep } from "./ThinkingEngineReal";
 import { saveMemory } from "./CloudMemory";
 import { ThinkingStream } from "./ThinkingStream";
 import { ProjectMemory } from "./ProjectMemory";
+import { ProjectBrain } from "./ProjectBrain";
+import { realThink } from "./RealThinking";
 
 export function isPlanningOrDevelopmentQuery(input: string): boolean {
   const clean = input.toLowerCase();
@@ -45,6 +47,11 @@ export class MamtaBrainReal extends MamtaBrainV15 {
   public smartAgents = new AgentBrain();
   public thinking = new ThinkingStream();
   public projectMemory = new ProjectMemory();
+  public projectBrain = new ProjectBrain();
+
+  public async realThink(input: string, memory: any) {
+    return await realThink(input, memory);
+  }
 
   decide(state: AutonomousState) {
     return decide(state);

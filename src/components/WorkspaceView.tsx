@@ -28,21 +28,31 @@ import {
   Smartphone,
   ExternalLink,
   Settings,
-  Link
+  Link,
+  Mic,
+  MicOff,
+  Volume2
 } from 'lucide-react';
 import { MasterPlan, ProjectTask } from '../types';
 import { MamtaBrainReal } from '../brain/MamtaBrainReal';
 import * as diff from 'diff';
 import { AutonomousLoop } from '../brain/AutonomousLoop';
+import { startVoiceInput } from '../voice/VoiceToCode';
+import { speak } from '../voice/VoiceOutput';
+import { loadProjects, saveProject } from '../db/ProjectStore';
+import { saveCloud, loadCloud } from '../brain/CloudSync';
+import { trackDeploy } from '../brain/DeployTracker';
+import { reloadPreview } from '../preview/HotReload';
 
 interface WorkspaceViewProps {
   sessionId: string;
   selectedPlanId: string | null;
   onSelectPlan: (planId: string) => void;
   brain: MamtaBrainReal;
+  userEmail?: string;
 }
 
-export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan, brain }: WorkspaceViewProps) {
+export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan, brain, userEmail }: WorkspaceViewProps) {
   // DB & State lists
   const [plans, setPlans] = useState<MasterPlan[]>([]);
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
@@ -59,6 +69,9 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan,
   const [isLoopRunning, setIsLoopRunning] = useState(false);
   const [isLoopPaused, setIsLoopPaused] = useState(false);
   const [thinkingSteps, setThinkingSteps] = useState<string[]>([]);
+  const [activeStage, setActiveStage] = useState<'plan' | 'build' | 'test' | 'fix' | 'deploy' | 'idle'>('idle');
+  const [isListening, setIsListening] = useState(false);
+  const [recognition, setRecognition] = useState<any>(null);
 
   // Loading/Running actions states
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -81,6 +94,21 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan,
   const [commitMessage, setCommitMessage] = useState('MAMTA AI Build: Automated Release');
   const [branchName, setBranchName] = useState('main');
   const [githubToken, setGithubToken] = useState('');
+
+  const getDeployStatus = () => {
+    for (let i = consoleLogs.length - 1; i >= 0; i--) {
+      const log = consoleLogs[i];
+      if (
+        log.toLowerCase().includes("deploy") ||
+        log.toLowerCase().includes("build") ||
+        log.toLowerCase().includes("upload") ||
+        log.toLowerCase().includes("vercel")
+      ) {
+        return trackDeploy(log);
+      }
+    }
+    return "IDLE";
+  };
 
   const terminalContainerRef = useRef<HTMLDivElement>(null);
 
@@ -212,6 +240,10 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan,
     const handleStatus = (status: string) => {
       setLoopStatus(status);
       addLog(status);
+      // TTS read loop events
+      if (status.includes("✅") || status.includes("❌") || status.includes("▶") || status.includes("⏸") || status.includes("Completed")) {
+        speak(status.replace(/[^\w\s\u0900-\u097F]/g, ''));
+      }
     };
     autoLoop.subscribe(handleStatus);
     return () => autoLoop.unsubscribe(handleStatus);
@@ -221,6 +253,8 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan,
     const unsubscribeThinking = brain.thinking.subscribe((step) => {
       setThinkingSteps(prev => [...prev, step]);
       addLog(`🧠 [ThinkingStream] ${step}`);
+      // TTS read thinking steps
+      speak(step);
     });
     return () => unsubscribeThinking();
   }, [brain]);
@@ -231,8 +265,69 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan,
     }
   }, [consoleLogs]);
 
+  useEffect(() => {
+    if (isAnalyzing) {
+      setActiveStage('plan');
+    } else if (isBuilding) {
+      setActiveStage('build');
+    } else if (isPushingGithub) {
+      setActiveStage('deploy');
+    } else if (isLoopRunning) {
+      const statusLower = loopStatus.toLowerCase();
+      if (statusLower.includes('plan') || statusLower.includes('assess') || statusLower.includes('thinking')) {
+        setActiveStage('plan');
+      } else if (statusLower.includes('build') || statusLower.includes('compil')) {
+        setActiveStage('build');
+      } else if (statusLower.includes('test') || statusLower.includes('qa')) {
+        setActiveStage('test');
+      } else if (statusLower.includes('fix') || statusLower.includes('correct') || statusLower.includes('heal') || statusLower.includes('debug')) {
+        setActiveStage('fix');
+      } else if (statusLower.includes('deploy') || statusLower.includes('launch') || statusLower.includes('push')) {
+        setActiveStage('deploy');
+      } else {
+        setActiveStage('build');
+      }
+    } else {
+      setActiveStage('idle');
+    }
+  }, [isAnalyzing, isBuilding, isPushingGithub, isLoopRunning, loopStatus]);
+
   const addLog = (log: string) => {
     setConsoleLogs(prev => [...prev, log]);
+  };
+
+  const handleToggleVoice = async () => {
+    if (isListening) {
+      if (recognition) {
+        recognition.stop();
+      }
+      setIsListening(false);
+      addLog("🎤 [VoiceControl] Voice input stopped.");
+      speak("Voice input deactivated.");
+    } else {
+      addLog("🎤 [VoiceControl] Activating voice coding...");
+      speak("Voice coding activated. Speak your request now.");
+      try {
+        const instance = await startVoiceInput(
+          (text) => {
+            addLog(`🗣️ [VoiceInput] Detected speech: "${text}"`);
+            speak(`I heard: ${text}. Processing voice command now...`);
+            setContextInput(text);
+          },
+          (err: any) => {
+            console.error(err);
+            addLog(`❌ [VoiceControl] Speech recognition ended.`);
+            setIsListening(false);
+          }
+        );
+        if (instance) {
+          setRecognition(instance);
+          setIsListening(true);
+        }
+      } catch (e: any) {
+        addLog(`❌ [VoiceControl] Initialization failure: ${e.message}`);
+      }
+    }
   };
 
   const fetchPlans = async () => {
@@ -247,6 +342,34 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan,
 
   const fetchPlanDetails = async () => {
     if (!selectedPlanId) return;
+
+    // 0. Load from local ProjectStore first for instantaneous UX load
+    try {
+      const storedProjects = loadProjects();
+      const localProj = storedProjects.find(p => String(p.id) === String(selectedPlanId));
+      if (localProj) {
+        if (localProj.files && localProj.files.length > 0) {
+          setFiles(localProj.files);
+        }
+        addLog(`📂 [Workspace] Instantly retrieved project "${localProj.name || 'Mamta Project'}" from local offline cache.`);
+      }
+    } catch (e) {
+      console.warn("Could not load initial project from localStorage:", e);
+    }
+
+    // Load from Cloud as fallback/sync
+    try {
+      const cloudProj = await loadCloud(userEmail || 'anonymous_user');
+      if (cloudProj && cloudProj.project && String(cloudProj.project.id) === String(selectedPlanId)) {
+        if (cloudProj.project.files && cloudProj.project.files.length > 0) {
+          setFiles(cloudProj.project.files);
+          addLog(`☁️ [Workspace] Successfully synchronized project file tree with Cloud Memory.`);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load from Cloud:", e);
+    }
+
     try {
       // 1. Fetch parsed tasks
       const tasksRes = await fetch(`/api/plans/${selectedPlanId}/tasks`);
@@ -272,6 +395,18 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan,
       const res = await fetch(`/api/workspace/files/${selectedPlanId}`);
       const data = await res.json();
       setFiles(data);
+      // Sync into local project store
+      saveProject({
+        id: selectedPlanId,
+        input: '',
+        files: data
+      });
+      // Sync to Cloud Storage
+      saveCloud(userEmail || 'anonymous_user', {
+        id: selectedPlanId,
+        files: data,
+        updatedAt: Date.now()
+      });
     } catch (err) {
       console.error('Failed to fetch file tree:', err);
     }
@@ -386,6 +521,7 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan,
       setOriginalContent(fileContent);
       addLog(`[SYSTEM] Manually committed custom edits to disk: ${selectedFile}`);
       setPreviewKey(prev => prev + 1);
+      reloadPreview();
     } catch (err: any) {
       addLog(`[ERROR] Save file failed: ${err.message}`);
     }
@@ -579,6 +715,70 @@ User Query: "${userText}"`;
         {selectedPlanId ? (
           <div className="flex-1 flex flex-col overflow-hidden">
             
+            {/* Visual Task Graph (Phase 6) */}
+            <div className="bg-slate-950/65 border border-slate-800/80 rounded-lg p-2.5 mb-2.5 shrink-0 space-y-2">
+              <div className="text-[10px] uppercase font-bold text-slate-400 font-mono tracking-wider">
+                🗺️ Autonomous Visual Flow (Task Graph)
+              </div>
+              
+              <div className="flex items-center justify-between relative px-1 py-1 bg-slate-900/40 rounded-lg border border-slate-850">
+                {/* Horizontal connection bar */}
+                <div className="absolute top-1/2 left-4 right-4 h-[2px] bg-slate-800 -translate-y-1/2 z-0" />
+                
+                {/* Flow progress overlay */}
+                <div 
+                  className="absolute top-1/2 left-4 h-[2px] bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 -translate-y-1/2 z-0 transition-all duration-500" 
+                  style={{
+                    width: activeStage === 'plan' ? '12%' 
+                           : activeStage === 'build' ? '35%' 
+                           : activeStage === 'test' ? '58%' 
+                           : activeStage === 'fix' ? '80%' 
+                           : activeStage === 'deploy' ? '92%' 
+                           : completedCount === tasks.length && tasks.length > 0 ? '92%' : '0%'
+                  }}
+                />
+
+                {[
+                  { id: 'plan', label: 'Plan' },
+                  { id: 'build', label: 'Build' },
+                  { id: 'test', label: 'Test' },
+                  { id: 'fix', label: 'Fix' },
+                  { id: 'deploy', label: 'Deploy' }
+                ].map((step, idx) => {
+                  const isCurrent = activeStage === step.id;
+                  const isPassed = (
+                    (step.id === 'plan' && (activeStage !== 'plan' && activeStage !== 'idle' || tasks.length > 0)) ||
+                    (step.id === 'build' && (activeStage === 'test' || activeStage === 'fix' || activeStage === 'deploy' || (completedCount > 0 && activeStage === 'idle'))) ||
+                    (step.id === 'test' && (activeStage === 'fix' || activeStage === 'deploy')) ||
+                    (step.id === 'fix' && (activeStage === 'deploy')) ||
+                    (completedCount === tasks.length && tasks.length > 0)
+                  );
+                  
+                  return (
+                    <div key={step.id} className="flex flex-col items-center z-10 relative">
+                      <div 
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold transition-all duration-300 border ${
+                          isCurrent 
+                            ? `bg-slate-900 border-indigo-500 text-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.5)] animate-pulse` 
+                            : isPassed 
+                            ? `bg-emerald-500/20 border-emerald-500/60 text-emerald-400` 
+                            : `bg-slate-950 border-slate-800 text-slate-600`
+                        }`}
+                        title={`${step.label} Phase`}
+                      >
+                        {isPassed ? '✓' : idx + 1}
+                      </div>
+                      <span className={`text-[8px] font-mono font-bold mt-1 transition-colors duration-300 ${
+                        isCurrent ? 'text-indigo-400 animate-pulse' : isPassed ? 'text-emerald-400' : 'text-slate-600'
+                      }`}>
+                        {step.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Progress Panel */}
             <div className="bg-slate-950/40 border border-slate-800 rounded-lg p-2.5 mb-2.5 shrink-0">
               <div className="flex justify-between text-[11px] font-semibold text-slate-300 mb-1">
@@ -595,6 +795,48 @@ User Query: "${userText}"`;
                 {completedCount} of {tasks.length} core task modules built
               </p>
             </div>
+
+            {/* Deployment Status Panel */}
+            {activeStage === 'deploy' && (
+              <div className="bg-indigo-950/15 border border-indigo-800/40 rounded-lg p-2.5 mb-2.5 shrink-0 animate-fade-in">
+                <div className="flex justify-between items-center text-[11px] font-semibold text-slate-300 mb-1.5">
+                  <span className="flex items-center gap-1">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                    </span>
+                    Live Deploy Tracker
+                  </span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold border ${
+                    getDeployStatus() === 'LIVE' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                    getDeployStatus() === 'FAILED' ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
+                    getDeployStatus() === 'BUILDING' ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse' :
+                    getDeployStatus() === 'UPLOADING' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400 animate-pulse' :
+                    'bg-slate-500/10 border-slate-500/30 text-slate-400'
+                  }`}>
+                    🚀 {getDeployStatus()}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-700 ${
+                      getDeployStatus() === 'LIVE' ? 'w-full bg-emerald-500' :
+                      getDeployStatus() === 'FAILED' ? 'w-full bg-rose-500' :
+                      getDeployStatus() === 'BUILDING' ? 'w-1/3 bg-amber-500' :
+                      getDeployStatus() === 'UPLOADING' ? 'w-2/3 bg-blue-500 animate-pulse' :
+                      'w-[10%] bg-indigo-500'
+                    }`}
+                  />
+                </div>
+                <p className="text-[9px] text-slate-400 mt-1.5">
+                  {getDeployStatus() === 'LIVE' ? '🎉 Deployment successful! Site is fully online.' :
+                   getDeployStatus() === 'FAILED' ? '❌ Local simulation build error or configuration mismatch.' :
+                   getDeployStatus() === 'BUILDING' ? '🔨 Building production distribution assets...' :
+                   getDeployStatus() === 'UPLOADING' ? '☁️ Uploading bundles & configuring Vercel domain...' :
+                   '⏳ Queuing deployment agent swarm...'}
+                </p>
+              </div>
+            )}
 
             {/* Checklist Tree */}
             <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 custom-scrollbar">
@@ -759,6 +1001,37 @@ User Query: "${userText}"`;
                   <Play className="w-3 h-3 fill-slate-200" />
                   <span>Or Run Manual Tasks Build Sequence</span>
                 </button>
+
+                {/* Voice Guided AI Control Console */}
+                <div className="bg-slate-900/60 p-2 border border-slate-800 rounded-lg flex items-center justify-between gap-2 mt-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="relative flex h-2 w-2">
+                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isListening ? 'bg-red-400' : 'bg-indigo-400'}`}></span>
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${isListening ? 'bg-red-500' : 'bg-indigo-500'}`}></span>
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-slate-300">Voice Coding Assistant</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={handleToggleVoice}
+                      className={`p-1.5 rounded-lg border flex items-center justify-center transition-all ${
+                        isListening 
+                          ? 'bg-rose-500/20 border-rose-500 text-rose-400 animate-pulse' 
+                          : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400'
+                      }`}
+                      title={isListening ? "Stop Voice Input" : "Start Voice Input"}
+                    >
+                      {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => speak("Voice engine online. Mamta AI is ready to speak and code.")}
+                      className="p-1.5 rounded-lg border bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400 transition-all"
+                      title="Test Voice Speak Output"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 

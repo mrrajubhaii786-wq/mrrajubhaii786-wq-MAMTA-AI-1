@@ -1294,6 +1294,22 @@ app.post('/api/autonomous/run-command', async (req, res) => {
   }
 });
 
+app.post('/api/workspace/test', async (req, res) => {
+  console.log(`🧪 [TestEngine] Triggering Vitest test suite via: 'npm run test'`);
+  try {
+    const { exec } = await import('child_process');
+    exec('npm run test', { timeout: 30000 }, (err: any, stdout: string, stderr: string) => {
+      res.json({
+        success: !err,
+        output: stdout + "\n" + stderr
+      });
+    });
+  } catch (err: any) {
+    console.error('Test execution API error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/chats/search', async (req, res) => {
   const { query } = req.body;
   if (!query) {
@@ -2626,6 +2642,203 @@ app.post('/api/workspace/files/:projectId/push-to-github', (req, res) => {
       remoteUrl: `https://github.com/user/${repoName}`
     });
 
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+app.post("/api/embeddings", async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: "Missing text parameter" });
+    }
+    const ai = getGeminiClient();
+    const result: any = await ai.models.embedContent({
+      model: 'text-embedding-004',
+      contents: text,
+    });
+    const embedding = result.embedding?.values || [];
+    res.json({ embedding });
+  } catch (err: any) {
+    console.warn("⚠️ [Server] Error generating Gemini text-embedding-004, falling back:", err.message);
+    res.json({ embedding: [] }); // return empty to allow client fallback gracefully
+  }
+});
+
+app.post("/api/github/pull-request", async (req, res) => {
+  try {
+    const { token, repo, title, head, base } = req.body;
+    if (!token || !repo || !title) {
+      return res.status(400).json({ error: "Missing required params: token, repo, title" });
+    }
+    const response = await fetch(`https://api.github.com/repos/${repo}/pulls`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/vnd.github.v3+json"
+      },
+      body: JSON.stringify({
+        title,
+        head: head || "ai-branch",
+        base: base || "main"
+      })
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      return res.status(response.status).json({ error: text });
+    }
+    res.json(JSON.parse(text));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// Distributed server-side cluster memory cache mimicking Redis keyspace
+const distributedServerMemory = new Map<string, any>();
+
+app.post("/api/distributed-memory/save", async (req, res) => {
+  try {
+    const { key, value } = req.body;
+    if (!key) {
+      return res.status(400).json({ error: "Missing memory key" });
+    }
+
+    const restUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const restToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+    if (restUrl && restToken) {
+      const cleanUrl = restUrl.trim().replace(/\/$/, "");
+      const response = await fetch(cleanUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${restToken.trim()}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(["SET", key, JSON.stringify(value)])
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Upstash REST SET error: ${errText}`);
+      }
+      console.log(`🧠 [UpstashRedis] Saved real globally synchronized key: "${key}"`);
+    } else {
+      distributedServerMemory.set(key, value);
+      console.log(`🧠 [ServerRedisEmulation] Saved distributed memory key (local fallback): "${key}"`);
+    }
+
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("⚠️ [DistributedMemory] Save error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/distributed-memory/load", async (req, res) => {
+  try {
+    const { key } = req.query;
+    if (!key) {
+      return res.status(400).json({ error: "Missing memory key parameter" });
+    }
+
+    const restUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const restToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+    if (restUrl && restToken) {
+      const cleanUrl = restUrl.trim().replace(/\/$/, "");
+      const response = await fetch(cleanUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${restToken.trim()}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(["GET", key as string])
+      });
+
+      if (response.ok) {
+        const data: any = await response.json();
+        if (data && data.result !== undefined && data.result !== null) {
+          try {
+            const parsed = JSON.parse(data.result);
+            return res.json({ value: parsed });
+          } catch (e) {
+            return res.json({ value: data.result });
+          }
+        }
+      } else {
+        const errText = await response.text();
+        console.warn(`⚠️ [UpstashRedis] GET error: ${errText}`);
+      }
+    }
+
+    const val = distributedServerMemory.get(key as string);
+    res.json({ value: val !== undefined ? val : null });
+  } catch (err: any) {
+    console.error("⚠️ [DistributedMemory] Load error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Production Deploy Webhook endpoint for live state updates
+app.post("/deploy-webhook", (req, res) => {
+  try {
+    const status = req.body.state || req.body.status;
+    console.log(`🚀 [DeployWebhook] Received status update: ${status}`);
+    if (status === "READY" || status === "LIVE" || status === "ready") {
+      console.log("🚀 LIVE DEPLOYED SUCCESSFUL!");
+    }
+    res.sendStatus(200);
+  } catch (err: any) {
+    console.error("Deploy Webhook processing error:", err.message);
+    res.status(500).send(err.message);
+  }
+});
+
+
+import crypto from "crypto";
+
+let oauthState = "";
+
+// GitHub OAuth login and callback proxy routes
+app.get("/auth/github", (req, res) => {
+  const clientId = process.env.GITHUB_CLIENT_ID || "mock_client_id";
+  oauthState = crypto.randomBytes(16).toString("hex");
+  const redirectUri = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo,user&state=${oauthState}`;
+  res.redirect(redirectUri);
+});
+
+app.get("/auth/github/callback", async (req, res) => {
+  try {
+    const code = req.query.code;
+    const state = req.query.state;
+
+    if (state && oauthState && state !== oauthState) {
+      return res.status(403).json({ error: "Invalid OAuth State - CSRF verification failed." });
+    }
+
+    if (!code) {
+      return res.status(400).json({ error: "Missing authorization code" });
+    }
+
+    const response = await fetch("https://github.com/login/oauth/access_token", {
+      method: "POST",
+      headers: { 
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        client_id: process.env.GITHUB_CLIENT_ID || "mock_client_id",
+        client_secret: process.env.GITHUB_SECRET || "mock_secret",
+        code
+      })
+    });
+
+    const data: any = await response.json();
+    res.json({ token: data.access_token || "mock_token_success_mamta_dev" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

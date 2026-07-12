@@ -37,6 +37,7 @@ import SafeDropView from './components/SafeDropView';
 import LaunchHubView from './components/LaunchHubView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { MamtaBrainReal } from './brain/MamtaBrainReal';
+import Toast from './components/Toast';
 
 export default function App() {
   const [brain] = useState(() => new MamtaBrainReal());
@@ -66,6 +67,31 @@ export default function App() {
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
   const [isProfileHubOpen, setIsProfileHubOpen] = useState<boolean>(false);
   const [bilingualLanguage, setBilingualLanguage] = useState<'en_hi' | 'hi'>('en_hi');
+
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
+
+  useEffect(() => {
+    (window as any).showToast = (message: string, type: 'error' | 'success' | 'info' = 'error') => {
+      const event = new CustomEvent('show-toast', { detail: { message, type } });
+      window.dispatchEvent(event);
+    };
+
+    const handleShowToast = (e: any) => {
+      if (e.detail) {
+        setToast({
+          message: e.detail.message,
+          type: e.detail.type || 'error'
+        });
+      }
+    };
+    window.addEventListener('show-toast' as any, handleShowToast);
+    return () => {
+      window.removeEventListener('show-toast' as any, handleShowToast);
+      try {
+        delete (window as any).showToast;
+      } catch (err) {}
+    };
+  }, []);
 
   const fetchSubscriptionMetrics = async () => {
     if (!sessionId) return;
@@ -475,6 +501,7 @@ export default function App() {
                   selectedPlanId={selectedPlanId}
                   onSelectPlan={handleSelectPlan}
                   brain={brain}
+                  userEmail={userEmail}
                 />
               )}
               {activeTab === 'admin' && (
@@ -686,6 +713,16 @@ export default function App() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
         )}
       </AnimatePresence>
 

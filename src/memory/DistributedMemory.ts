@@ -4,7 +4,8 @@ let redisInstance: any = null;
 
 // Dynamically import Redis only on the server side to prevent browser bundling issues with ioredis
 if (typeof window === "undefined") {
-  import("./RedisClient")
+  const redisPath = "./RedisClient" + "";
+  import(/* @vite-ignore */ redisPath)
     .then((mod) => {
       redisInstance = mod.redis;
     })

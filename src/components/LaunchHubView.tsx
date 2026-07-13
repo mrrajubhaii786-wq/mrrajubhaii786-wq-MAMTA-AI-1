@@ -28,7 +28,9 @@ import {
   BarChart2,
   CheckCircle2,
   Loader2,
-  Plus
+  Plus,
+  Cpu,
+  Briefcase
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ContentEngine } from '../growth/ContentEngine';
@@ -88,6 +90,63 @@ export default function LaunchHubView({ sessionId }: LaunchHubViewProps) {
   const [isQueuePosting, setIsQueuePosting] = useState(false);
   const [isTriggeringScheduler, setIsTriggeringScheduler] = useState(false);
 
+  // AI Company Engine States (Master Plan 20)
+  const [companyState, setCompanyState] = useState<any>({
+    revenue: 85,
+    users: 480,
+    products: [],
+    logs: [],
+    lastDecision: "FOCUS_MARKETING",
+    isActive: true,
+    mrr: 85,
+    cash: 1250
+  });
+  const [isCompanyLoading, setIsCompanyLoading] = useState(false);
+  const [isTogglingCompany, setIsTogglingCompany] = useState(false);
+  const [launchHubTab, setLaunchHubTab] = useState<'company' | 'landing' | 'marketing'>('company');
+
+  const fetchCompanyState = async () => {
+    try {
+      const res = await fetch('/api/company/state');
+      const data = await res.json();
+      if (data && !data.error) {
+        setCompanyState(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch AI Company Engine state:', err);
+    }
+  };
+
+  const handleToggleCompanyLoop = async () => {
+    setIsTogglingCompany(true);
+    try {
+      const res = await fetch('/api/company/toggle', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setCompanyState((prev: any) => ({ ...prev, isActive: data.isActive }));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsTogglingCompany(false);
+    }
+  };
+
+  const handleTriggerCompanyTick = async () => {
+    setIsCompanyLoading(true);
+    try {
+      const res = await fetch('/api/company/trigger', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setCompanyState(data.state);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsCompanyLoading(false);
+    }
+  };
+
   const fetchGrowthQueue = async () => {
     try {
       const res = await fetch('/api/growth/queue');
@@ -103,8 +162,12 @@ export default function LaunchHubView({ sessionId }: LaunchHubViewProps) {
 
   useEffect(() => {
     fetchGrowthQueue();
-    // Poll every 10 seconds for real-time updates
-    const interval = setInterval(fetchGrowthQueue, 10000);
+    fetchCompanyState();
+    // Poll every 5 seconds for real-time updates of company state and growth queue
+    const interval = setInterval(() => {
+      fetchGrowthQueue();
+      fetchCompanyState();
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -394,11 +457,270 @@ export default function LaunchHubView({ sessionId }: LaunchHubViewProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* LEFT COLUMN: Landing Page Live Sandbox & Builder (7 Cols) */}
-        <div className="lg:col-span-7 space-y-6">
-          <div className="bg-slate-900/30 border border-slate-900 rounded-2xl overflow-hidden backdrop-blur-xl">
+      {/* Tab Navigation Menu */}
+      <div className="flex flex-wrap border-b border-slate-900/40 pb-2.5 gap-2 shrink-0">
+        <button
+          onClick={() => setLaunchHubTab('company')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+            launchHubTab === 'company' 
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15' 
+              : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+          }`}
+        >
+          <Cpu className="w-4 h-4" />
+          <span>AI Company Engine</span>
+          <span className="text-[7.5px] bg-emerald-500/20 text-emerald-300 font-mono px-1.5 py-0.2 rounded font-extrabold uppercase animate-pulse">AUTONOMOUS</span>
+        </button>
+
+        <button
+          onClick={() => setLaunchHubTab('landing')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+            launchHubTab === 'landing' 
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15' 
+              : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          <span>SaaS Landers & Studios</span>
+        </button>
+
+        <button
+          onClick={() => setLaunchHubTab('marketing')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+            launchHubTab === 'marketing' 
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15' 
+              : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+          }`}
+        >
+          <Radio className="w-4 h-4" />
+          <span>Viral Automation & Queue</span>
+        </button>
+      </div>
+
+      {/* AI COMPANY ENGINE VIEW */}
+      {launchHubTab === 'company' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-[fadeIn_0.3s_ease]">
+          
+          {/* Left Side: CEO Strategy Desk & Portfolio (7 Cols) */}
+          <div className="lg:col-span-7 space-y-6">
+            
+            {/* CEO BRAIN & DECISION STATION */}
+            <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-6 space-y-5 backdrop-blur-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-emerald-500/5 to-transparent pointer-events-none" />
+              
+              <div className="flex justify-between items-center border-b border-slate-900 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    <Briefcase className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider">CEO Strategic Decision Station</h3>
+                    <p className="text-[10px] text-slate-500 font-mono">ROLE: CHIEF EXECUTIVE OFFICER AI</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-slate-950 px-3 py-1 rounded-lg border border-slate-900">
+                    <span className={`w-2 h-2 rounded-full ${companyState.isActive ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                    <span className="text-[10px] font-mono uppercase font-bold text-slate-300">
+                      {companyState.isActive ? 'Autonomous' : 'Paused'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Strategy Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-slate-950/60 rounded-xl p-4 border border-slate-900/80 space-y-2">
+                  <p className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">Active Action Plan</p>
+                  <div className="inline-flex items-center gap-1.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded-full text-xs font-bold font-mono">
+                    {companyState.lastDecision}
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed mt-2.5">
+                    {companyState.lastDecision === "FOCUS_MARKETING" && "The CEO is prioritising user acquisition due to low initial revenue thresholds. Directing the growth and marketing engines to run aggressive organic campaigns."}
+                    {companyState.lastDecision === "SCALE_INFRA" && "Total active user volume is scaling rapidly! The CEO has ordered immediate microservice provisioning and pod expansion via the Kubernetes scale engine."}
+                    {companyState.lastDecision === "BUILD_NEW_PRODUCT" && "Financial capital and user engagement targets are locked. Initiating fresh product sprint to construct and launch an autonomous micro-SaaS tool."}
+                  </p>
+                </div>
+
+                <div className="bg-slate-950/40 rounded-xl p-4 border border-slate-900/80 flex flex-col justify-between">
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">Manual Override</p>
+                    <p className="text-[10.5px] text-slate-400">
+                      Force-trigger an immediate decision tick to run the company loop, onboard users, secure MRR, or scale infrastructure.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      onClick={handleToggleCompanyLoop}
+                      disabled={isTogglingCompany}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg border cursor-pointer transition-all ${
+                        companyState.isActive 
+                          ? 'bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/20 text-rose-400' 
+                          : 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20 text-emerald-400'
+                      }`}
+                    >
+                      {companyState.isActive ? 'Pause Loop' : 'Resume Loop'}
+                    </button>
+                    <button
+                      onClick={handleTriggerCompanyTick}
+                      disabled={isCompanyLoading || !companyState.isActive}
+                      className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-slate-950 font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/10 transition-all"
+                    >
+                      {isCompanyLoading ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" />
+                          <span>Ticking...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>Trigger Tick</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* PORTFOLIO OF LAUNCHED PRODUCTS */}
+            <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-6 space-y-4 backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-slate-900 pb-3.5">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4.5 h-4.5 text-indigo-400" />
+                  <h3 className="text-xs font-bold text-slate-100 uppercase tracking-wide">Launched Micro-SaaS Portfolio</h3>
+                </div>
+                <span className="text-[9px] text-slate-500 font-mono bg-slate-950 px-2 py-0.5 rounded">
+                  Active Products ({companyState.products?.length || 0})
+                </span>
+              </div>
+
+              {(!companyState.products || companyState.products.length === 0) ? (
+                <div className="border border-dashed border-slate-900 rounded-xl p-8 text-center text-slate-500 text-xs font-mono">
+                  📭 No micro-SaaS products launched yet. The loop will launch one once revenue triggers build state!
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {companyState.products.map((p: any, idx: number) => (
+                    <div key={idx} className="bg-slate-950/80 border border-slate-900 rounded-xl p-4 space-y-3 relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-12 h-12 bg-gradient-to-bl from-emerald-500/10 to-transparent pointer-events-none" />
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <h4 className="text-xs font-extrabold text-slate-200 group-hover:text-emerald-400 transition-colors">{p.product}</h4>
+                          <span className="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 px-1.5 py-0.2 rounded font-mono uppercase font-bold">
+                            Live
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 font-mono mt-1">Deploy: {p.launch}</p>
+                      </div>
+
+                      <div className="border-t border-slate-900/80 pt-2.5 flex items-center justify-between text-[9.5px] text-slate-400 font-mono">
+                        <span className="text-indigo-400">{p.marketing}</span>
+                        <span>{p.timestamp ? new Date(p.timestamp).toLocaleTimeString() : 'Active'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          {/* Right Side: Live Startup Stats & Autonomous Console Logs (5 Cols) */}
+          <div className="lg:col-span-5 space-y-6">
+            
+            {/* REAL-TIME ENGINE FINANCIAL TELEMETRY */}
+            <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-5 space-y-4 backdrop-blur-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-indigo-500/5 to-transparent pointer-events-none" />
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4.5 h-4.5 text-amber-400" />
+                <h3 className="text-xs font-bold text-slate-100 uppercase tracking-wide">Autonomous Engine Telemetry</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-900/80">
+                  <p className="text-[8px] font-mono text-slate-500 uppercase tracking-widest">Monthly Recurring (MRR)</p>
+                  <p className="text-lg font-black text-emerald-400 mt-1">${companyState.revenue}/mo</p>
+                  <p className="text-[8px] text-emerald-500/80 font-mono mt-1">📈 Upward Trajectory</p>
+                </div>
+
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-900/80">
+                  <p className="text-[8px] font-mono text-slate-500 uppercase tracking-widest">Active User Base</p>
+                  <p className="text-lg font-black text-indigo-400 mt-1">{companyState.users}</p>
+                  <p className="text-[8px] text-indigo-500/80 font-mono mt-1">👥 Active Sessions</p>
+                </div>
+
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-900/80">
+                  <p className="text-[8px] font-mono text-slate-500 uppercase tracking-widest">Company Treasury Cash</p>
+                  <p className="text-lg font-black text-amber-400 mt-1">${companyState.cash}</p>
+                  <p className="text-[8px] text-amber-500/80 font-mono mt-1">💰 Total Cash Reserves</p>
+                </div>
+
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-900/80">
+                  <p className="text-[8px] font-mono text-slate-500 uppercase tracking-widest">Interconnected Engines</p>
+                  <p className="text-lg font-black text-purple-400 mt-1">5 Nodes</p>
+                  <p className="text-[8px] text-purple-500/80 font-mono mt-1">⚡ Integrated Core</p>
+                </div>
+              </div>
+            </div>
+
+            {/* AUTONOMOUS OPERATIONAL LOGS */}
+            <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-5 space-y-4 backdrop-blur-xl relative overflow-hidden">
+              <div className="flex items-center justify-between border-b border-slate-900 pb-3">
+                <div className="flex items-center gap-2">
+                  <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
+                  <h3 className="text-xs font-bold text-slate-100 uppercase tracking-wide">Engine Live Workload logs</h3>
+                </div>
+                <button
+                  onClick={fetchCompanyState}
+                  className="text-[8px] text-slate-500 hover:text-slate-300 font-mono uppercase bg-slate-950 px-2 py-0.5 rounded border border-slate-900 cursor-pointer"
+                >
+                  Sync Logs
+                </button>
+              </div>
+
+              {(!companyState.logs || companyState.logs.length === 0) ? (
+                <div className="border border-dashed border-slate-900 rounded-xl p-6 text-center text-slate-500 text-xs font-mono">
+                  ⏳ Waiting for next background corporate transaction...
+                </div>
+              ) : (
+                <div className="bg-slate-950 rounded-xl p-4 border border-slate-900 font-mono text-[9.5px] text-slate-300 space-y-2 max-h-[350px] overflow-y-auto custom-scrollbar shadow-inner animate-[fadeIn_0.2s_ease]">
+                  {companyState.logs.map((log: string, idx: number) => (
+                    <p key={idx} className={
+                      log.includes('💰') || log.includes('RevenueEngine') ? 'text-emerald-400' :
+                      log.includes('🧠') || log.includes('CEO') ? 'text-amber-300 font-medium' :
+                      log.includes('📈') || log.includes('UserEngine') ? 'text-indigo-400' :
+                      log.includes('🚀') || log.includes('LaunchAI') ? 'text-purple-400' :
+                      'text-slate-300'
+                    }>
+                      {log}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-start gap-2 text-[9px] text-slate-500 leading-normal font-mono pt-1">
+                <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                <span>The autonomous background cron loop performs strategic company iterations every 30 seconds. Force decision trigger overrides the cron for instant execution.</span>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
+      {launchHubTab !== 'company' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          {/* LEFT COLUMN: Landing Page Live Sandbox & Builder (7 Cols) */}
+          <div className="lg:col-span-7 space-y-6">
+            
+            {launchHubTab === 'landing' && (
+              <>
+                <div className="bg-slate-900/30 border border-slate-900 rounded-2xl overflow-hidden backdrop-blur-xl">
             
             {/* Header Controls */}
             <div className="p-4 border-b border-slate-900 bg-slate-950/40 flex items-center justify-between">
@@ -548,6 +870,11 @@ export default function LaunchHubView({ sessionId }: LaunchHubViewProps) {
 
           {/* 🎙️ MAMTA VOICE AI STUDIO */}
           <MamtaVoiceStudio sessionId={sessionId} />
+              </>
+            )}
+
+            {launchHubTab === 'marketing' && (
+              <>
 
           {/* 🎥 MAMTA AVATAR AI STUDIO */}
           <MamtaAvatarStudio sessionId={sessionId} />
@@ -1080,6 +1407,8 @@ export default function LaunchHubView({ sessionId }: LaunchHubViewProps) {
             </div>
 
           </div>
+              </>
+            )}
 
         </div>
 
@@ -1238,6 +1567,7 @@ export default function LaunchHubView({ sessionId }: LaunchHubViewProps) {
         </div>
 
       </div>
+      )}
 
     </div>
   );

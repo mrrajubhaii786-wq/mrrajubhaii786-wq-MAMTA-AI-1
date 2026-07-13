@@ -25,7 +25,9 @@ import {
   ExternalLink,
   Globe,
   Database,
-  Code
+  Code,
+  Compass,
+  Brain
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -35,13 +37,19 @@ import WorkspaceView from './components/WorkspaceView';
 import AdminView from './components/AdminView';
 import SafeDropView from './components/SafeDropView';
 import LaunchHubView from './components/LaunchHubView';
+import EmpireView from './components/EmpireView';
+import CivilizationView from './components/CivilizationView';
+import WorldView from './components/WorldView';
+import UniverseView from './components/UniverseView';
+import MultiverseView from './components/MultiverseView';
+import AgiView from './components/AgiView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { MamtaBrainReal } from './brain/MamtaBrainReal';
 import Toast from './components/Toast';
 
 export default function App() {
   const [brain] = useState(() => new MamtaBrainReal());
-  const [activeTab, setActiveTab] = useState<'home' | 'workspace' | 'admin' | 'safedrop' | 'launch'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'workspace' | 'admin' | 'safedrop' | 'launch' | 'empire' | 'civilization' | 'world' | 'universe' | 'multiverse' | 'agi'>('home');
   const [sessionId, setSessionId] = useState('');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -233,6 +241,84 @@ export default function App() {
             </button>
 
             <button
+              id="nav_link_empire"
+              onClick={() => { setActiveTab('empire'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'empire' 
+                  ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-400 border border-emerald-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5 shrink-0" />
+              <span>AI Empire Control</span>
+            </button>
+
+            <button
+              id="nav_link_civilization"
+              onClick={() => { setActiveTab('civilization'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'civilization' 
+                  ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/5 text-amber-400 border border-amber-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5 shrink-0" />
+              <span>AI Civilization OS</span>
+            </button>
+
+            <button
+              id="nav_link_world"
+              onClick={() => { setActiveTab('world'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'world' 
+                  ? 'bg-gradient-to-r from-blue-500/10 to-indigo-500/5 text-blue-400 border border-blue-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5 shrink-0" />
+              <span>AI World Simulator</span>
+            </button>
+
+            <button
+              id="nav_link_universe"
+              onClick={() => { setActiveTab('universe'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'universe' 
+                  ? 'bg-gradient-to-r from-indigo-500/10 to-purple-500/5 text-indigo-400 border border-indigo-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5 shrink-0 text-indigo-400 animate-spin" style={{ animationDuration: '30s' }} />
+              <span>AI Universe Simulator</span>
+            </button>
+
+            <button
+              id="nav_link_multiverse"
+              onClick={() => { setActiveTab('multiverse'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'multiverse' 
+                  ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/5 text-purple-400 border border-purple-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5 shrink-0 text-purple-400 animate-spin" style={{ animationDuration: '60s' }} />
+              <span>AI Multiverse AGI</span>
+            </button>
+
+            <button
+              id="nav_link_agi"
+              onClick={() => { setActiveTab('agi'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'agi' 
+                  ? 'bg-gradient-to-r from-indigo-500/10 to-purple-500/5 text-indigo-400 border border-indigo-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Brain className="w-3.5 h-3.5 shrink-0 text-indigo-400" />
+              <span>AGI Consciousness Core</span>
+            </button>
+
+            <button
               id="nav_link_admin"
               onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
@@ -374,6 +460,66 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => { setActiveTab('empire'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'empire' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Globe className="w-4 h-4" />
+                <span>AI Empire Control</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('civilization'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'civilization' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Activity className="w-4 h-4" />
+                <span>AI Civilization OS</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('world'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'world' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Compass className="w-4 h-4" />
+                <span>AI World Simulator</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('universe'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'universe' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Compass className="w-4 h-4 animate-spin" style={{ animationDuration: '30s' }} />
+                <span>AI Universe Simulator</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('multiverse'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'multiverse' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Compass className="w-4 h-4 animate-spin" style={{ animationDuration: '60s' }} />
+                <span>AI Multiverse AGI</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('agi'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'agi' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Brain className="w-4 h-4" />
+                <span>AGI Consciousness Core</span>
+              </button>
+
+              <button
                 onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
                   activeTab === 'admin' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15' : 'text-slate-400'
@@ -512,6 +658,24 @@ export default function App() {
               )}
               {activeTab === 'launch' && (
                 <LaunchHubView sessionId={sessionId} />
+              )}
+              {activeTab === 'empire' && (
+                <EmpireView />
+              )}
+              {activeTab === 'civilization' && (
+                <CivilizationView />
+              )}
+              {activeTab === 'world' && (
+                <WorldView />
+              )}
+              {activeTab === 'universe' && (
+                <UniverseView />
+              )}
+              {activeTab === 'multiverse' && (
+                <MultiverseView />
+              )}
+              {activeTab === 'agi' && (
+                <AgiView />
               )}
             </motion.div>
           </AnimatePresence>

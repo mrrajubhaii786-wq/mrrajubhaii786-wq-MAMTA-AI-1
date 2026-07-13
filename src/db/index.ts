@@ -13,10 +13,10 @@ export const createPool = () => {
     connectionTimeoutMillis: 15000,
     idleTimeoutMillis: 30000,
     max: 20,
-    min: 5,
+    min: 0,
     statement_timeout: 30000,
     query_timeout: 30000,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ssl: false,
   });
 };
 

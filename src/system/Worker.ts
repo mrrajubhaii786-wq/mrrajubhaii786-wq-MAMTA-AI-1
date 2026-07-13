@@ -2,6 +2,9 @@
 import { aiQueue } from "./QueueManager";
 import { canExecute, recordFailure, resetCircuit } from "./CircuitBreaker";
 import { AGIEngine } from "../brain/AGIEngine";
+import { validateCommand, validateAction } from "./Guardrails";
+import { safeExec } from "./Sandbox";
+import { saveVersion } from "./VersionControl";
 
 const agi = new AGIEngine();
 
@@ -28,31 +31,44 @@ aiQueue.process(async (job) => {
 
     console.log(`⚡ [Worker] AGI Decision outcome:`, decision);
 
+    // Merge decision values
+    const action = decision.action || taskQuery;
+    const command = job.data.command || `echo 'Executing task: ${action}'`;
+
+    // 🛡️ Guardrails Layer validation
+    validateAction(action);
+    validateCommand(command);
+
+    // 🧾 Save version state before execution
+    saveVersion(job.data);
+
+    // 🧪 Sandbox execution (Containerized / Fallback Protected)
+    const sandboxOutput = await safeExec(command);
+    console.log("🧪 [Worker] Sandbox Output:", sandboxOutput);
+
     // Simulate real AI processing workload and steps
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     let result;
-    const action = decision.action || taskQuery; // Fallback to taskQuery if action is unspecified
-
     switch (action) {
       case "BUILD":
         console.log("🏗️ [Worker] AI Build successful in sandboxed environment.");
-        result = { status: "SUCCESS", message: "Build Complete", decision, timestamp: Date.now() };
+        result = { status: "SUCCESS", message: "Build Complete", decision, sandboxOutput, timestamp: Date.now() };
         break;
 
       case "FIX":
         console.log("🔧 [Worker] AI Self-Correction loop repaired system discrepancies.");
-        result = { status: "SUCCESS", message: "Fixed Errors", decision, timestamp: Date.now() };
+        result = { status: "SUCCESS", message: "Fixed Errors", decision, sandboxOutput, timestamp: Date.now() };
         break;
 
       case "DEPLOY":
         console.log("🚀 [Worker] Deploying successfully to scalable production cluster.");
-        result = { status: "SUCCESS", message: "Deployed", decision, timestamp: Date.now() };
+        result = { status: "SUCCESS", message: "Deployed", decision, sandboxOutput, timestamp: Date.now() };
         break;
 
       default:
         console.log(`⚠️ [Worker] AGI returned action "${action}" (or idle state).`);
-        result = { status: "SUCCESS", message: `Idle or Custom execution: ${action}`, decision, timestamp: Date.now() };
+        result = { status: "SUCCESS", message: `Execution completed: ${action}`, decision, sandboxOutput, timestamp: Date.now() };
         break;
     }
 

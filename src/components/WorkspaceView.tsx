@@ -31,7 +31,8 @@ import {
   Link,
   Mic,
   MicOff,
-  Volume2
+  Volume2,
+  Brain
 } from 'lucide-react';
 import { MasterPlan, ProjectTask } from '../types';
 import { MamtaBrainReal } from '../brain/MamtaBrainReal';
@@ -43,6 +44,8 @@ import { loadProjects, saveProject } from '../db/ProjectStore';
 import { saveCloud, loadCloud } from '../brain/CloudSync';
 import { trackDeploy } from '../brain/DeployTracker';
 import { reloadPreview } from '../preview/HotReload';
+import AgentHiveView from './AgentHiveView';
+import LiveTerminal from './LiveTerminal';
 
 interface WorkspaceViewProps {
   sessionId: string;
@@ -113,7 +116,7 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan,
   const terminalContainerRef = useRef<HTMLDivElement>(null);
 
   // Tab Navigation states
-  const [activeCenterTab, setActiveCenterTab] = useState<'editor' | 'preview'>('editor');
+  const [activeCenterTab, setActiveCenterTab] = useState<'editor' | 'preview' | 'hive' | 'terminal'>('editor');
   const [activeRightTab, setActiveRightTab] = useState<'chat' | 'integrations'>('chat');
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [previewKey, setPreviewKey] = useState(0);
@@ -1107,6 +1110,26 @@ User Query: "${userText}"`;
               <Globe className="w-3.5 h-3.5" />
               <span>👀 Live Web Preview</span>
             </button>
+            <button
+              id="center_hive_tab_trigger"
+              onClick={() => setActiveCenterTab('hive')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                activeCenterTab === 'hive' ? 'bg-slate-800 text-emerald-400 shadow-md border border-slate-700/50' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Brain className="w-3.5 h-3.5 text-emerald-400" />
+              <span>🧠 AGI Agent Hive</span>
+            </button>
+            <button
+              id="center_terminal_tab_trigger"
+              onClick={() => setActiveCenterTab('terminal')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                activeCenterTab === 'terminal' ? 'bg-slate-800 text-emerald-400 shadow-md border border-slate-700/50' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+              <span>💻 Sandbox Terminal</span>
+            </button>
           </div>
           
           {activeCenterTab === 'preview' && (
@@ -1327,6 +1350,16 @@ User Query: "${userText}"`;
                 </div>
               )}
             </div>
+          </div>
+        ) : activeCenterTab === 'hive' ? (
+          /* Live Agent Hive visualizer dashboard */
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <AgentHiveView />
+          </div>
+        ) : activeCenterTab === 'terminal' ? (
+          /* Live Sandbox Docker Terminal Panel */
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+            <LiveTerminal />
           </div>
         ) : (
           /* Live Web Preview Window Container */

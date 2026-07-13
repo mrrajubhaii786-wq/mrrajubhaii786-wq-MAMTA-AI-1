@@ -1,5 +1,6 @@
 // src/brain/LearningEngine.ts
 import { DistributedMemory } from "../memory/DistributedMemory";
+import { validateMemory } from "./MemoryValidator";
 
 export class LearningEngine {
   /**
@@ -34,6 +35,13 @@ export class LearningEngine {
    * Signature is flexible (supports 2 or 3 arguments) for backward compatibility.
    */
   async learn(input: string, result: any, extra?: any): Promise<void> {
+    const entry = { input, result, extra };
+
+    if (!validateMemory(entry)) {
+      console.warn("⚠️ [LearningEngine] Invalid memory rejected (failed safety check):", entry);
+      return;
+    }
+
     let existing: any[] = [];
     try {
       const data = await DistributedMemory.load("learning");

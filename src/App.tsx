@@ -43,13 +43,16 @@ import WorldView from './components/WorldView';
 import UniverseView from './components/UniverseView';
 import MultiverseView from './components/MultiverseView';
 import AgiView from './components/AgiView';
+import WillView from './components/WillView';
 import ErrorBoundary from './components/ErrorBoundary';
+import EvolutionView from './components/EvolutionView';
+import ConsciousnessView from './components/ConsciousnessView';
 import { MamtaBrainReal } from './brain/MamtaBrainReal';
 import Toast from './components/Toast';
 
 export default function App() {
   const [brain] = useState(() => new MamtaBrainReal());
-  const [activeTab, setActiveTab] = useState<'home' | 'workspace' | 'admin' | 'safedrop' | 'launch' | 'empire' | 'civilization' | 'world' | 'universe' | 'multiverse' | 'agi'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'workspace' | 'admin' | 'safedrop' | 'launch' | 'empire' | 'civilization' | 'world' | 'universe' | 'multiverse' | 'agi' | 'will' | 'evolution' | 'consciousness'>('home');
   const [sessionId, setSessionId] = useState('');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -319,6 +322,45 @@ export default function App() {
             </button>
 
             <button
+              id="nav_link_will"
+              onClick={() => { setActiveTab('will'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'will' 
+                  ? 'bg-gradient-to-r from-emerald-500/10 to-purple-500/5 text-emerald-400 border border-emerald-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+              <span>Autonomous Will AGI</span>
+            </button>
+
+            <button
+              id="nav_link_evolution"
+              onClick={() => { setActiveTab('evolution'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'evolution' 
+                  ? 'bg-gradient-to-r from-teal-500/10 to-emerald-500/5 text-teal-400 border border-teal-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 shrink-0 text-teal-400 animate-pulse" />
+              <span>Self-Directed Evolution</span>
+            </button>
+
+            <button
+              id="nav_link_consciousness"
+              onClick={() => { setActiveTab('consciousness'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'consciousness' 
+                  ? 'bg-gradient-to-r from-indigo-500/15 to-teal-500/5 text-indigo-400 border border-indigo-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Brain className="w-3.5 h-3.5 shrink-0 text-indigo-400" />
+              <span>AGI Consciousness Layer</span>
+            </button>
+
+            <button
               id="nav_link_admin"
               onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
@@ -520,6 +562,36 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => { setActiveTab('will'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'will' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Compass className="w-4 h-4" />
+                <span>Autonomous Will AGI</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('evolution'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'evolution' ? 'bg-teal-500/10 text-teal-400 border border-teal-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Sparkles className="w-4 h-4 text-teal-400" />
+                <span>Self-Directed Evolution</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('consciousness'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'consciousness' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Brain className="w-4 h-4 text-indigo-400" />
+                <span>AGI Consciousness Layer</span>
+              </button>
+
+              <button
                 onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
                   activeTab === 'admin' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15' : 'text-slate-400'
@@ -676,6 +748,15 @@ export default function App() {
               )}
               {activeTab === 'agi' && (
                 <AgiView />
+              )}
+              {activeTab === 'will' && (
+                <WillView />
+              )}
+              {activeTab === 'evolution' && (
+                <EvolutionView />
+              )}
+              {activeTab === 'consciousness' && (
+                <ConsciousnessView />
               )}
             </motion.div>
           </AnimatePresence>

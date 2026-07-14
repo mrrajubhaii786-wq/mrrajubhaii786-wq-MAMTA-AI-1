@@ -3200,6 +3200,159 @@ app.post("/api/agi/trigger", (req, res) => {
 });
 
 
+// AUTONOMOUS WILL AGI SYSTEM (MASTER PLAN 27)
+import { willSimulationState, runWillAutonomousTick, runSimulatedSelfHeal, evaluateUserCommand } from "./src/agi/WillLoop";
+
+app.use(express.json()); // Ensure body parser is ready for body params
+
+app.get("/api/will/state", (req, res) => {
+  try {
+    res.json(willSimulationState);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/will/toggle", (req, res) => {
+  try {
+    willSimulationState.isActive = !willSimulationState.isActive;
+    res.json({ success: true, isActive: willSimulationState.isActive });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/will/trigger", (req, res) => {
+  try {
+    runWillAutonomousTick();
+    res.json({ success: true, state: willSimulationState });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/will/command", (req, res) => {
+  try {
+    const { command } = req.body;
+    const isRejected = evaluateUserCommand(command || "");
+    res.json({ success: true, rejected: isRejected, state: willSimulationState });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/will/heal", (req, res) => {
+  try {
+    const { file, code } = req.body;
+    const outcome = runSimulatedSelfHeal(file || "src/agi/WillAI.ts", code || "");
+    res.json({ success: true, outcome, state: willSimulationState });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// AGI SELF-DIRECTED EVOLUTION SYSTEM (MASTER PLAN 28)
+import { evolutionLoopInstance } from "./src/agi/EvolutionLoop";
+
+app.get("/api/evolution/state", (req, res) => {
+  try {
+    res.json(evolutionLoopInstance.getStatus());
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/evolution/toggle", async (req, res) => {
+  try {
+    const status = evolutionLoopInstance.getStatus();
+    if (status.isActive) {
+      evolutionLoopInstance.stop();
+    } else {
+      await evolutionLoopInstance.start();
+    }
+    res.json({ success: true, state: evolutionLoopInstance.getStatus() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/evolution/trigger", async (req, res) => {
+  try {
+    await evolutionLoopInstance.tick();
+    res.json({ success: true, state: evolutionLoopInstance.getStatus() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/evolution/sandbox", (req, res) => {
+  try {
+    const { code } = req.body;
+    const outcome = evolutionLoopInstance.runCustomSandbox(code || "");
+    res.json({ success: true, outcome });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/evolution/vote", (req, res) => {
+  try {
+    const { voteData } = req.body;
+    const outcome = evolutionLoopInstance.castVote(voteData || {});
+    res.json({ success: true, outcome });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// AGI CONSCIOUSNESS LAYER SYSTEM (MASTER PLAN 29)
+import { consciousnessLoopInstance } from "./src/agi/ConsciousnessLoop";
+
+app.get("/api/consciousness/state", (req, res) => {
+  try {
+    res.json(consciousnessLoopInstance.getStatus());
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/consciousness/toggle", async (req, res) => {
+  try {
+    const status = consciousnessLoopInstance.getStatus();
+    if (status.isActive) {
+      consciousnessLoopInstance.stop();
+    } else {
+      await consciousnessLoopInstance.start();
+    }
+    res.json({ success: true, state: consciousnessLoopInstance.getStatus() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/consciousness/trigger", async (req, res) => {
+  try {
+    await consciousnessLoopInstance.tick();
+    res.json({ success: true, state: consciousnessLoopInstance.getStatus() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/consciousness/validate-ast", (req, res) => {
+  try {
+    const { code } = req.body;
+    const check = consciousnessLoopInstance.validateCustomCode(code || "");
+    res.json({ success: true, check });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
 
 // Serve static frontend in production; run Vite dev middleware in development
 async function startServer() {

@@ -47,12 +47,14 @@ import WillView from './components/WillView';
 import ErrorBoundary from './components/ErrorBoundary';
 import EvolutionView from './components/EvolutionView';
 import ConsciousnessView from './components/ConsciousnessView';
+import MetaIntelligenceView from './components/MetaIntelligenceView';
+import SystemGovernorView from './components/SystemGovernorView';
 import { MamtaBrainReal } from './brain/MamtaBrainReal';
 import Toast from './components/Toast';
 
 export default function App() {
   const [brain] = useState(() => new MamtaBrainReal());
-  const [activeTab, setActiveTab] = useState<'home' | 'workspace' | 'admin' | 'safedrop' | 'launch' | 'empire' | 'civilization' | 'world' | 'universe' | 'multiverse' | 'agi' | 'will' | 'evolution' | 'consciousness'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'workspace' | 'admin' | 'safedrop' | 'launch' | 'empire' | 'civilization' | 'world' | 'universe' | 'multiverse' | 'agi' | 'will' | 'evolution' | 'consciousness' | 'meta-intelligence' | 'system-governor'>('home');
   const [sessionId, setSessionId] = useState('');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -361,6 +363,33 @@ export default function App() {
             </button>
 
             <button
+              id="nav_link_meta_intelligence"
+              onClick={() => { setActiveTab('meta-intelligence'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'meta-intelligence' 
+                  ? 'bg-gradient-to-r from-indigo-500/15 to-teal-500/5 text-indigo-400 border border-indigo-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5 shrink-0 text-indigo-400" />
+              <span>AGI Meta-Intelligence</span>
+            </button>
+
+            <button
+              id="nav_link_system_governor"
+              onClick={() => { setActiveTab('system-governor'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'system-governor' 
+                  ? 'bg-gradient-to-r from-cyan-500/15 to-indigo-500/5 text-cyan-400 border border-cyan-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
+              <span>AGI System Governor</span>
+            </button>
+
+
+            <button
               id="nav_link_admin"
               onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
@@ -592,6 +621,27 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => { setActiveTab('meta-intelligence'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'meta-intelligence' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Cpu className="w-4 h-4 text-indigo-400" />
+                <span>AGI Meta-Intelligence</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('system-governor'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'system-governor' ? 'bg-[#06b6d4]/10 text-cyan-400 border border-[#06b6d4]/15' : 'text-slate-400'
+                }`}
+              >
+                <Shield className="w-4 h-4 text-cyan-400" />
+                <span>AGI System Governor</span>
+              </button>
+
+
+              <button
                 onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
                   activeTab === 'admin' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15' : 'text-slate-400'
@@ -758,6 +808,13 @@ export default function App() {
               {activeTab === 'consciousness' && (
                 <ConsciousnessView />
               )}
+              {activeTab === 'meta-intelligence' && (
+                <MetaIntelligenceView />
+              )}
+              {activeTab === 'system-governor' && (
+                <SystemGovernorView />
+              )}
+
             </motion.div>
           </AnimatePresence>
         </ErrorBoundary>

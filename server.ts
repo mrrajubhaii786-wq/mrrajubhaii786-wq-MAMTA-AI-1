@@ -3352,6 +3352,121 @@ app.post("/api/consciousness/validate-ast", (req, res) => {
 });
 
 
+// AGI META-INTELLIGENCE LAYER SYSTEM (MASTER PLAN 30)
+import { metaLoopInstance } from "./src/agi/MetaLoop";
+
+app.get("/api/meta-intelligence/state", (req, res) => {
+  try {
+    res.json(metaLoopInstance.getStatus());
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/meta-intelligence/toggle", async (req, res) => {
+  try {
+    const status = metaLoopInstance.getStatus();
+    if (status.isActive) {
+      metaLoopInstance.stop();
+    } else {
+      await metaLoopInstance.start();
+    }
+    res.json({ success: true, state: metaLoopInstance.getStatus() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/meta-intelligence/trigger", async (req, res) => {
+  try {
+    await metaLoopInstance.tick();
+    res.json({ success: true, state: metaLoopInstance.getStatus() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/meta-intelligence/verify-auth", (req, res) => {
+  try {
+    const { action, signature } = req.body;
+    const outcome = metaLoopInstance.verifyAction(action || "", signature || "");
+    res.json({ success: true, outcome });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/meta-intelligence/test-code", (req, res) => {
+  try {
+    const { code } = req.body;
+    const testReport = metaLoopInstance.runTestOnCode(code || "");
+    res.json({ success: true, testReport });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// AGI SYSTEM GOVERNOR LAYER SYSTEM (MASTER PLAN 31)
+import { governorLoopInstance } from "./src/agi/GovernorLoop";
+
+app.get("/api/system-governor/state", (req, res) => {
+  try {
+    res.json(governorLoopInstance.getStatus());
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/system-governor/toggle", async (req, res) => {
+  try {
+    const status = governorLoopInstance.getStatus();
+    if (status.isActive) {
+      governorLoopInstance.stop();
+    } else {
+      await governorLoopInstance.start();
+    }
+    res.json({ success: true, state: governorLoopInstance.getStatus() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/system-governor/trigger", async (req, res) => {
+  try {
+    await governorLoopInstance.tick();
+    res.json({ success: true, state: governorLoopInstance.getStatus() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/system-governor/config", (req, res) => {
+  try {
+    const { health, actions } = req.body;
+    governorLoopInstance.setConfig(
+      typeof health === "number" ? health : 88,
+      Array.isArray(actions) ? actions : ["DEPLOY", "OPTIMIZE"]
+    );
+    res.json({ success: true, state: governorLoopInstance.getStatus() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/system-governor/verify-auth", (req, res) => {
+  try {
+    const { signature } = req.body;
+    const outcome = governorLoopInstance.verifySignature(signature || "");
+    res.json({ success: true, outcome });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
 
 
 // Serve static frontend in production; run Vite dev middleware in development

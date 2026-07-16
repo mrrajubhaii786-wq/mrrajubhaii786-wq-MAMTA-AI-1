@@ -1352,63 +1352,73 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.98 }}
               className="relative w-full h-full bg-slate-900 flex overflow-hidden z-10 text-slate-200"
             >
-              {/* Left Sidebar Menu */}
-              <div className="w-full md:w-64 bg-slate-950/60 border-b md:border-b-0 md:border-r border-slate-800 p-6 flex flex-col justify-between shrink-0">
+              {/* Left Sidebar Menu - sleek responsive narrow sidebar on mobile, full width on desktop */}
+              <div className="w-16 md:w-64 bg-slate-950/60 border-r border-slate-800 p-3 md:p-6 flex flex-col justify-between shrink-0">
                 <div className="space-y-6">
-                  <div>
-                    <span className="px-2 py-0.5 text-[8px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded uppercase font-bold tracking-widest font-mono">
+                  {/* Branding Header */}
+                  <div className="text-center md:text-left">
+                    <span className="hidden md:inline-block px-2 py-0.5 text-[8px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded uppercase font-bold tracking-widest font-mono">
                       MAMTA CONSOLE
                     </span>
                     <h2 className="text-sm font-black text-slate-100 uppercase tracking-wider mt-2 font-mono">
-                      Core Control
+                      <span className="md:hidden text-emerald-400 text-base font-extrabold" title="MAMTA Core Control">M</span>
+                      <span className="hidden md:inline">Core Control</span>
                     </h2>
-                    <p className="text-[10px] text-slate-500 font-mono">
+                    <p className="hidden md:block text-[10px] text-slate-500 font-mono">
                       Manage profile, settings & rewards
                     </p>
                   </div>
 
-                  <nav className="flex flex-row md:flex-col gap-1.5 md:gap-2 overflow-x-auto md:overflow-visible pb-2 md:pb-0 scrollbar-none">
+                  {/* Navigation Menu */}
+                  <nav className="flex flex-col gap-3">
                     <button
                       onClick={() => setSettingsActiveTab('profile')}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 whitespace-nowrap shrink-0 ${
+                      title="Profile & Limits"
+                      className={`px-2.5 py-2.5 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center md:justify-start gap-2.5 whitespace-nowrap shrink-0 cursor-pointer ${
                         settingsActiveTab === 'profile'
                           ? 'bg-slate-800 text-slate-100 border border-slate-700 shadow-md shadow-emerald-500/5'
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
                       }`}
                     >
-                      <User className="w-4 h-4 text-emerald-400" />
-                      <span>Profile & Limits</span>
+                      <User className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span className="hidden md:inline">Profile & Limits</span>
                     </button>
 
                     <button
                       onClick={() => setSettingsActiveTab('general')}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 whitespace-nowrap shrink-0 ${
+                      title="General Settings"
+                      className={`px-2.5 py-2.5 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center md:justify-start gap-2.5 whitespace-nowrap shrink-0 cursor-pointer ${
                         settingsActiveTab === 'general'
                           ? 'bg-slate-800 text-slate-100 border border-slate-700'
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
                       }`}
                     >
-                      <Settings className="w-4 h-4 text-slate-400" />
-                      <span>General Settings</span>
+                      <Settings className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span className="hidden md:inline">General Settings</span>
                     </button>
 
                     <button
                       onClick={() => setSettingsActiveTab('affiliate')}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 whitespace-nowrap shrink-0 ${
+                      title="Affiliate Program"
+                      className={`px-2.5 py-2.5 md:px-3 md:py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center md:justify-start gap-2.5 whitespace-nowrap shrink-0 cursor-pointer ${
                         settingsActiveTab === 'affiliate'
                           ? 'bg-gradient-to-r from-teal-500/10 to-emerald-500/10 border border-teal-500/20 text-teal-400'
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850/40 border border-transparent'
                       }`}
                     >
-                      <Share2 className="w-4 h-4 text-teal-400" />
-                      <span>Affiliate Program</span>
+                      <Share2 className="w-4 h-4 text-teal-400 shrink-0" />
+                      <span className="hidden md:inline">Affiliate Program</span>
                     </button>
                   </nav>
                 </div>
 
-                <div className="hidden md:block p-3 bg-slate-900/60 rounded-xl border border-slate-850 text-center">
-                  <span className="text-[9px] text-slate-500 font-mono block">Signed in as</span>
-                  <span className="text-[10px] text-emerald-400 font-mono truncate block font-bold mt-0.5">{userEmail}</span>
+                {/* Account info indicator */}
+                <div className="p-1 md:p-3 bg-slate-900/60 rounded-xl border border-slate-850 text-center">
+                  <span className="hidden md:block text-[9px] text-slate-500 font-mono">Signed in as</span>
+                  <span className="text-[10px] text-emerald-400 font-mono truncate block font-bold mt-0.5 md:max-w-none max-w-[28px] mx-auto overflow-hidden text-ellipsis" title={userEmail}>
+                    <span className="md:hidden">@</span>
+                    <span className="hidden md:inline">{userEmail}</span>
+                  </span>
                 </div>
               </div>
 

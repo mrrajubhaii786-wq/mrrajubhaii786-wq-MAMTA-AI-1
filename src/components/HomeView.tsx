@@ -327,7 +327,7 @@ export default function HomeView({
 
   const handleCreateOrderAndUpgrade = async (planKey: 'pro' | 'premium') => {
     setIsProcessingUpgrade(true);
-    const amount = planKey === 'pro' ? 499 : 1499;
+    const amount = planKey === 'pro' ? 499 : 999;
 
     try {
       // 1. Create order on the backend (Razorpay SDK)

@@ -151,14 +151,17 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Generate or fetch a stable sessionId
-    let sid = sessionStorage.getItem('mamta_session_id');
-    if (!sid) {
-      sid = 'session_' + Math.random().toString(36).substring(2, 11);
-      sessionStorage.setItem('mamta_session_id', sid);
+    if (isLoggedIn && userEmail && userEmail.includes('@')) {
+      setSessionId(userEmail);
+    } else {
+      let sid = sessionStorage.getItem('mamta_session_id');
+      if (!sid) {
+        sid = 'session_' + Math.random().toString(36).substring(2, 11);
+        sessionStorage.setItem('mamta_session_id', sid);
+      }
+      setSessionId(sid);
     }
-    setSessionId(sid);
-  }, []);
+  }, [isLoggedIn, userEmail]);
 
   useEffect(() => {
     if (sessionId) {

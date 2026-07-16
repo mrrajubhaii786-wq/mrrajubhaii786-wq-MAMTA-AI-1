@@ -31,9 +31,15 @@ import {
   BarChart2,
   Share2,
   TrendingUp,
-  Upload
+  Upload,
+  Briefcase,
+  Users,
+  Megaphone,
+  Trash2,
+  Settings
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import GlobalDominationView from './GlobalDominationView';
 
 interface SaasPlatformViewProps {
   sessionId: string;
@@ -52,7 +58,7 @@ export default function SaasPlatformView({ sessionId }: SaasPlatformViewProps) {
   const [userProfile, setUserProfile] = useState<any>(null);
 
   // Active Screen Tab
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'ai-tool' | 'billing' | 'docs' | 'analytics' | 'affiliate' | 'team-scaling' | 'branding-pitch' | 'enterprise-automation'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'ai-tool' | 'billing' | 'docs' | 'analytics' | 'affiliate' | 'team-scaling' | 'branding-pitch' | 'enterprise-automation' | 'global-domination'>('dashboard');
 
   // Project versioning states (Step 6 Version Control System)
   const [projectVersions, setProjectVersions] = useState<any[]>([]);
@@ -100,6 +106,149 @@ export default function SaasPlatformView({ sessionId }: SaasPlatformViewProps) {
   // ₹1 Crore SaaS Revenue Math Calculator States (Step 6)
   const [calcSubscribers, setCalcSubscribers] = useState(500);
   const [calcPrice, setCalcPrice] = useState(499);
+
+  // Step 6: Team Scaling States
+  const [teamMembers, setTeamMembers] = useState<any[]>([
+    { id: '1', name: 'Rajveer Singh', role: 'Solo Founder', salary: 0, efficiency: 100 },
+  ]);
+  const [jobPostRole, setJobPostRole] = useState('Full Stack AI Developer');
+  const [candidatesList, setCandidatesList] = useState<any[]>([]);
+  const [isGeneratingCandidates, setIsGeneratingCandidates] = useState(false);
+
+  // Step 6: Branding & Investor Pitch States
+  const [pitchSaaSName, setPitchSaaSName] = useState('Mamta AI Studio');
+  const [pitchSaaSProblem, setPitchSaaSProblem] = useState('Building high-quality websites takes weeks of coding and thousands of dollars, locking out non-technical founders.');
+  const [pitchSaaSSolution, setPitchSaaSSolution] = useState('Mamta AI synthesizes high-fidelity, production-ready full-stack applications in 5 seconds from direct voice commands.');
+  const [pitchSaaSTraction, setPitchSaaSTraction] = useState('Launched prototype with 2,500+ organic sandbox users and ₹1.5 Lakhs generated in simulated micro-revenue.');
+  const [pitchSaaSTarget, setPitchSaaSTarget] = useState('₹1 Crore ARR within 12 months.');
+  const [isGeneratingPitch, setIsGeneratingPitch] = useState(false);
+  const [pitchDeckSlides, setPitchDeckSlides] = useState<any[]>([
+    { title: "Mamta AI Studio", subtitle: "Building ₹1 Crore SaaS Empires dynamically from direct voice instructions.", category: "VISION" },
+    { title: "The Massive Problem", problem: "Website development is slow, costly, and requires complex programming stacks.", category: "PROBLEM" },
+    { title: "The Mamta AI Solution", solution: "Instant 1-click voice-to-code website synthesis with real-time Firestore database & secure Stripe/Razorpay webhooks.", category: "SOLUTION" },
+    { title: "The Revenue Engine", detail: "Multi-tenant SaaS subscription model charging ₹499/month for Pro features.", category: "MARKET MATH" },
+    { title: "Scaling to the Stars", nextSteps: "Auto-pilot marketing loops & dedicated elite team scaling.", category: "ROADMAP" }
+  ]);
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+
+  // Step 6: Enterprise Automation States
+  const [isAutopilotEnabled, setIsAutopilotEnabled] = useState(false);
+  const [autoLogs, setAutoLogs] = useState<string[]>([
+    `[${new Date().toLocaleTimeString()}] System loaded. Autopilot standby.`
+  ]);
+  const [autoOptions, setAutoOptions] = useState({
+    socialMedia: true,
+    seoBlog: true,
+    selfHealing: true,
+    commissionCashout: false
+  });
+
+  // Step 7: Global Domination States
+  const [dominationSubTab, setDominationSubTab] = useState<'mobile' | 'domains' | 'voice-ai' | 'global-infra' | 'branding-viral' | 'revenue-roadmap'>('mobile');
+  
+  // Custom Domain States
+  const [customDomainInput, setCustomDomainInput] = useState('');
+  const [connectedDomains, setConnectedDomains] = useState<string[]>(['mybrand.com']);
+  const [dnsVerifyStatus, setDnsVerifyStatus] = useState<'idle' | 'verifying' | 'verified' | 'failed'>('idle');
+  const [sslStatus, setSslStatus] = useState<'none' | 'pending' | 'active'>('active');
+
+  // Voice AI States
+  const [voiceCommandInput, setVoiceCommandInput] = useState('');
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false);
+  const [voiceLanguage, setVoiceLanguage] = useState<'hinglish' | 'hindi' | 'english'>('hinglish');
+
+  // Mobile App Launcher States
+  const [mobileSimulatorDevice, setMobileSimulatorDevice] = useState<'android' | 'ios'>('android');
+  const [isCompilingMobile, setIsCompilingMobile] = useState(false);
+  const [mobileCompileLogs, setMobileCompileLogs] = useState<string[]>([]);
+
+  // Personal Brand Virality States
+  const [brandPlatform, setBrandPlatform] = useState<'instagram' | 'youtube' | 'twitter' | 'linkedin'>('youtube');
+  const [brandTopic, setBrandTopic] = useState('0 to ₹1L using Mamta AI');
+  const [generatedViralScript, setGeneratedViralScript] = useState('');
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+
+  // ₹10 Crore Roadmap States
+  const [roadmapTargetARR, setRoadmapTargetARR] = useState(100000000); // 10 Cr
+  const [roadmapUsersCount, setRoadmapUsersCount] = useState(10000); // 10k users
+
+  useEffect(() => {
+    if (!isAutopilotEnabled) return;
+    
+    const messages = [
+      "Auto-SEO Bot: Re-indexing sitemap.xml on Google Search Console.",
+      "YouTube Bot: Synthesizing daily Mamta AI video presentation and uploading automatically.",
+      "Twitter Bot: Firing viral marketing thread promoting student-affiliates program.",
+      "Security Engine: Scanning for injection vectors on payment webhook routing... Safe.",
+      "SaaS Ledger: Automatically synchronized Firestore shard telemetry records with pgDatabase.",
+      "Self-Healing: Verified server.ts compilation. Live load checks: 100% stable."
+    ];
+    
+    const interval = setInterval(() => {
+      const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+      setAutoLogs(prev => [`[${new Date().toLocaleTimeString()}] ${randomMsg}`, ...prev.slice(0, 15)]);
+    }, 4500);
+    
+    return () => clearInterval(interval);
+  }, [isAutopilotEnabled]);
+
+  const generateCandidatesPool = async () => {
+    setIsGeneratingCandidates(true);
+    setTimeout(() => {
+      const candidates = [
+        { name: "Aarav Sharma", role: jobPostRole, match: 94, salary: 45000, skills: ["React", "Express", "Tailwind CSS"], avatar: "🇮🇳" },
+        { name: "Priya Patel", role: jobPostRole, match: 91, salary: 38000, skills: ["Next.js", "Firebase", "TypeScript"], avatar: "👩‍💻" },
+        { name: "Vikram Malhotra", role: jobPostRole, match: 87, salary: 50000, skills: ["AI Agent Prompting", "Node.js", "Postgres"], avatar: "👨‍💻" },
+        { name: "Ananya Iyer", role: jobPostRole, match: 96, salary: 60000, skills: ["Full-stack", "Stripe", "CI/CD Orchestration"], avatar: "🚀" }
+      ];
+      setCandidatesList(candidates);
+      setIsGeneratingCandidates(false);
+      if ((window as any).showToast) {
+        (window as any).showToast("✓ Mamta AI generated candidate pool!", "success");
+      }
+    }, 1200);
+  };
+
+  const hireCandidate = (candidate: any) => {
+    setTeamMembers(prev => [...prev, { ...candidate, id: String(Date.now()) }]);
+    setCandidatesList(prev => prev.filter(c => c.name !== candidate.name));
+    if ((window as any).showToast) {
+      (window as any).showToast(`🎉 Successfully hired ${candidate.name} as ${candidate.role}!`, "success");
+    }
+  };
+
+  const fireMember = (id: string, name: string) => {
+    if (id === '1') {
+      alert("You cannot fire the Solo Founder!");
+      return;
+    }
+    setTeamMembers(prev => prev.filter(m => m.id !== id));
+    if ((window as any).showToast) {
+      (window as any).showToast(`⚠️ Terminated team contract for ${name}.`, "warning");
+    }
+  };
+
+  const generateInvestorPitchDeck = () => {
+    setIsGeneratingPitch(true);
+    setTimeout(() => {
+      const slides = [
+        { title: pitchSaaSName, subtitle: `Building ₹1 Crore SaaS Empires dynamically from direct voice instructions.`, category: "VISION" },
+        { title: "The Problem", problem: pitchSaaSProblem, category: "PROBLEM" },
+        { title: "The Solution", solution: pitchSaaSSolution, category: "SOLUTION" },
+        { title: "Market Revenue Math", detail: `Targeting ${calcSubscribers} active monthly users paying ₹${calcPrice}/month. Total projected ARR: ₹${((calcSubscribers * calcPrice * 12) / 100000).toFixed(2)} Lakhs!`, category: "BUSINESS MODEL" },
+        { title: "Elite SaaS Traction", traction: pitchSaaSTraction, category: "TRACTION" },
+        { title: "The Scaling Team", team: `${teamMembers.length} active experts. Operational Burn: ₹${teamMembers.reduce((acc, curr) => acc + (curr.salary || 0), 0)}/month. Efficiency quotient: ${teamMembers.reduce((acc, curr) => acc + (curr.efficiency || 90), 0)}%`, category: "TEAM" },
+        { title: "Our Target", nextSteps: `Reaching ${pitchSaaSTarget} through self-running AI marketing automation loops.`, category: "GO TO MARKET" }
+      ];
+      setPitchDeckSlides(slides);
+      setActiveSlideIndex(0);
+      setIsGeneratingPitch(false);
+      if ((window as any).showToast) {
+        (window as any).showToast("🏆 Custom high-fidelity Investor Pitch Deck compiled successfully!", "success");
+      }
+    }, 1500);
+  };
 
   const fetchUserProjects = async (userEmail: string) => {
     try {
@@ -490,9 +639,19 @@ export default function SaasPlatformView({ sessionId }: SaasPlatformViewProps) {
         setUserProfile(data.user);
         setCountry(data.user.country);
         fetchUserProjects(targetEmail);
+      } else {
+        // Clear stale localstorage to prevent broken state
+        localStorage.removeItem('saas_email');
+        localStorage.removeItem('saas_token');
+        setToken(null);
+        setUserProfile(null);
       }
     } catch (err) {
       console.error("Failed to fetch SaaS profile:", err);
+      localStorage.removeItem('saas_email');
+      localStorage.removeItem('saas_token');
+      setToken(null);
+      setUserProfile(null);
     }
   };
 
@@ -506,21 +665,34 @@ export default function SaasPlatformView({ sessionId }: SaasPlatformViewProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, country })
       });
+      
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setToken(data.token);
         setUserProfile(data.user);
-        localStorage.setItem('saas_email', email);
+        localStorage.setItem('saas_email', email.trim());
         localStorage.setItem('saas_token', data.token);
-        fetchUserProjects(email);
+        fetchUserProjects(email.trim());
         
         // Trigger generic window event for global app syncing
         if ((window as any).showToast) {
           (window as any).showToast(`Logged into MAMTA AI SaaS Hub successfully!`, 'success');
         }
+      } else {
+        const errorMsg = data.error || data.message || "Failed to authenticate. Please check your credentials.";
+        if ((window as any).showToast) {
+          (window as any).showToast(`❌ Login Error: ${errorMsg}`, 'error');
+        } else {
+          alert(`Login Error: ${errorMsg}`);
+        }
       }
     } catch (err: any) {
-      alert("Login failed: " + err.message);
+      const errorMsg = err.message || "Connection error to the authentication server.";
+      if ((window as any).showToast) {
+        (window as any).showToast(`❌ Connection Error: ${errorMsg}`, 'error');
+      } else {
+        alert("Login failed: " + errorMsg);
+      }
     } finally {
       setIsAuthenticating(false);
     }
@@ -880,54 +1052,81 @@ export default function SaasPlatformView({ sessionId }: SaasPlatformViewProps) {
             className="space-y-6"
           >
             {/* Tab Links Menu */}
-            <div className="flex border-b border-slate-900/50 pb-2.5 gap-2 shrink-0">
+            <div className="flex flex-wrap border-b border-slate-900/50 pb-2.5 gap-2 shrink-0">
               <button
                 onClick={() => setActiveTab('dashboard')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
                   activeTab === 'dashboard' 
                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15' 
                     : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
                 }`}
               >
-                <Grid className="w-4 h-4" />
+                <Grid className="w-3.5 h-3.5" />
                 <span>Tenancy Dashboard</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('ai-tool')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
                   activeTab === 'ai-tool' 
                     ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/15' 
                     : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
                 }`}
               >
-                <Code className="w-4 h-4" />
+                <Code className="w-3.5 h-3.5" />
                 <span>AI Website Builder</span>
-                <span className="text-[7px] bg-cyan-500/20 text-cyan-300 font-mono px-1 rounded font-black uppercase animate-pulse">KILLER FEATURE</span>
+                <span className="text-[6.5px] bg-cyan-500/20 text-cyan-300 font-mono px-1 rounded font-black uppercase animate-pulse">LIVE</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('billing')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
                   activeTab === 'billing' 
                     ? 'bg-amber-500/10 text-amber-400 border-amber-500/15' 
                     : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
                 }`}
               >
-                <CreditCard className="w-4 h-4" />
+                <CreditCard className="w-3.5 h-3.5" />
                 <span>Billing & Upgrades</span>
               </button>
 
               <button
-                onClick={() => setActiveTab('docs')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
-                  activeTab === 'docs' 
+                onClick={() => setActiveTab('team-scaling')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  activeTab === 'team-scaling' 
+                    ? 'bg-rose-500/10 text-rose-400 border-rose-500/15' 
+                    : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Team Hiring</span>
+                <span className="text-[6.5px] bg-rose-500/20 text-rose-300 font-mono px-1 rounded font-black uppercase">STEP 6</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('branding-pitch')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  activeTab === 'branding-pitch' 
                     ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/15' 
                     : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
                 }`}
               >
-                <BookOpen className="w-4 h-4" />
-                <span>Platform Docs</span>
+                <Megaphone className="w-3.5 h-3.5" />
+                <span>Investor Pitch</span>
+                <span className="text-[6.5px] bg-indigo-500/20 text-indigo-300 font-mono px-1 rounded font-black uppercase">DECK</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('enterprise-automation')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  activeTab === 'enterprise-automation' 
+                    ? 'bg-purple-500/10 text-purple-400 border-purple-500/15' 
+                    : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+                }`}
+              >
+                <Cpu className="w-3.5 h-3.5" />
+                <span>Automation</span>
+                <span className="text-[6.5px] bg-purple-500/20 text-purple-300 font-mono px-1 rounded font-black uppercase">AUTO</span>
               </button>
 
               <button
@@ -937,26 +1136,51 @@ export default function SaasPlatformView({ sessionId }: SaasPlatformViewProps) {
                     fetchAnalytics(userProfile.email);
                   }
                 }}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
                   activeTab === 'analytics' 
                     ? 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/15' 
                     : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
                 }`}
               >
-                <BarChart2 className="w-4 h-4" />
-                <span>Analytics Dashboard</span>
+                <BarChart2 className="w-3.5 h-3.5" />
+                <span>Analytics</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('affiliate')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
                   activeTab === 'affiliate' 
                     ? 'bg-teal-500/10 text-teal-400 border-teal-500/15' 
                     : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
                 }`}
               >
-                <Share2 className="w-4 h-4" />
-                <span>Affiliate Growth</span>
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Affiliate</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('docs')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  activeTab === 'docs' 
+                    ? 'bg-sky-500/10 text-sky-400 border-sky-500/15' 
+                    : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Docs</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('global-domination')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border animate-pulse ${
+                  activeTab === 'global-domination' 
+                    ? 'bg-emerald-400 text-slate-950 border-emerald-400 font-black shadow-lg shadow-emerald-500/20' 
+                    : 'text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-300'
+                }`}
+              >
+                <Flame className="w-3.5 h-3.5" />
+                <span>Global Domination</span>
+                <span className="text-[6.5px] bg-red-600 text-white font-mono px-1 rounded font-black uppercase">STEP 7</span>
               </button>
 
               <button
@@ -2310,6 +2534,654 @@ export default function SaasPlatformView({ sessionId }: SaasPlatformViewProps) {
                     </div>
                   </div>
                 </motion.div>
+              )}
+
+              {/* Tab: Team Scaling / Hiring */}
+              {activeTab === 'team-scaling' && (
+                <motion.div 
+                  key="tab-team-scaling"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-6"
+                >
+                  {/* Goal and Hero Section */}
+                  <div className="bg-gradient-to-r from-rose-950/20 to-slate-950 border border-slate-900 rounded-2xl p-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-rose-500/5 to-transparent pointer-events-none" />
+                    <span className="px-2.5 py-0.5 rounded font-mono text-[8px] bg-rose-500/10 border border-rose-500/20 text-rose-400 uppercase font-black tracking-widest">
+                      TEAM HIRING SYSTEM (FOUNDATION OF SCALE)
+                    </span>
+                    <h3 className="text-sm font-black text-slate-100 uppercase tracking-wide mt-3">
+                      Mamta AI Smart Scaling & Talent Acquisition Hub
+                    </h3>
+                    <p className="text-[10.5px] text-slate-400 leading-relaxed max-w-2xl mt-1.5 font-mono">
+                      Transition from a **Solo Founder** to a **Scalable Enterprise** of autonomous professionals. Use the Mamta AI talent locator to generate highly matching profiles, hire specialists to increase your operational throughput, and manage payroll.
+                    </p>
+                  </div>
+
+                  {/* Core Content Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left Panel: Active Team Ledger (5 Cols) */}
+                    <div className="lg:col-span-5 bg-slate-950 border border-slate-900 rounded-2xl p-5 flex flex-col justify-between">
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide flex items-center gap-2">
+                            <Users className="w-4 h-4 text-rose-400" />
+                            <span>My Active Team Matrix</span>
+                          </h4>
+                          <p className="text-[9px] text-slate-500 font-mono">
+                            Current hired workforce, monthly overhead burn, and efficiency multiplier
+                          </p>
+                        </div>
+
+                        {/* Stats Panel */}
+                        <div className="grid grid-cols-2 gap-3 py-1 font-mono">
+                          <div className="p-3 bg-slate-900/40 border border-slate-900 rounded-xl">
+                            <span className="text-[8.5px] text-slate-500 block uppercase">Monthly Overhead</span>
+                            <strong className="text-sm text-rose-400">
+                              ₹{teamMembers.reduce((acc, m) => acc + (m.salary || 0), 0).toLocaleString('en-IN')}
+                            </strong>
+                          </div>
+                          <div className="p-3 bg-slate-900/40 border border-slate-900 rounded-xl">
+                            <span className="text-[8.5px] text-slate-500 block uppercase">Productivity Rate</span>
+                            <strong className="text-sm text-emerald-400">
+                              {teamMembers.reduce((acc, m) => acc + (m.efficiency || 90), 0)}%
+                            </strong>
+                          </div>
+                        </div>
+
+                        {/* Team Ledger List */}
+                        <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                          {teamMembers.map((member) => (
+                            <div 
+                              key={member.id} 
+                              className="p-3 bg-slate-900/20 border border-slate-900/80 rounded-xl flex items-center justify-between gap-3 hover:border-slate-800 transition-all"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-lg">{member.avatar || "💼"}</span>
+                                <div>
+                                  <h5 className="text-[11px] font-bold text-slate-200 leading-tight">{member.name}</h5>
+                                  <span className="text-[8.5px] text-slate-500 font-mono block">{member.role}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 font-mono">
+                                <div className="text-right">
+                                  <span className="text-[9px] text-emerald-400 block font-bold">
+                                    {member.salary === 0 ? "Equity" : `₹${member.salary.toLocaleString('en-IN')}`}
+                                  </span>
+                                  <span className="text-[7.5px] text-slate-500 block">Eff: {member.efficiency}%</span>
+                                </div>
+                                {member.id !== '1' && (
+                                  <button
+                                    onClick={() => fireMember(member.id, member.name)}
+                                    className="p-1 hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 rounded-md transition-colors cursor-pointer"
+                                    title="Terminate Contract"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-slate-900/60 text-[9.5px] text-slate-500 font-mono leading-relaxed">
+                        💡 <strong className="text-slate-300">Scale Rule:</strong> Your SaaS platform's theoretical capacity increases with more team members. Total MRR calculator considers hired developers as system multiplier anchors!
+                      </div>
+                    </div>
+
+                    {/* Right Panel: Job Post & Candidate Spawner (7 Cols) */}
+                    <div className="lg:col-span-7 bg-slate-950 border border-slate-900 rounded-2xl p-5 space-y-4">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide flex items-center gap-2">
+                          <Briefcase className="w-4 h-4 text-rose-400" />
+                          <span>Mamta AI Job Search & Hire Core</span>
+                        </h4>
+                        <p className="text-[9px] text-slate-500 font-mono">
+                          Describe the role you need to hire, and let Mamta AI generate highly optimized candidates
+                        </p>
+                      </div>
+
+                      {/* Input Selector */}
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                        <div className="sm:col-span-8 space-y-1.5">
+                          <label className="text-[8.5px] font-mono text-slate-400 uppercase tracking-wider block">
+                            Target Job Role Position
+                          </label>
+                          <select
+                            value={jobPostRole}
+                            onChange={(e) => setJobPostRole(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-rose-500/40 cursor-pointer font-mono"
+                          >
+                            <option value="Full Stack AI Developer">Full Stack AI Developer (React/Express)</option>
+                            <option value="SaaS Growth Marketer">SaaS Growth Marketer (SEO/Social)</option>
+                            <option value="Global Affiliate Manager">Global Affiliate Manager (Outreach)</option>
+                            <option value="DevOps & AWS Architect">DevOps & Cloud Architect (Scale/Infra)</option>
+                            <option value="AI Content Creator">AI Video Creator (Automated Socials)</option>
+                          </select>
+                        </div>
+
+                        <button
+                          onClick={generateCandidatesPool}
+                          disabled={isGeneratingCandidates}
+                          className="sm:col-span-4 py-2 bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-slate-950 font-black text-xs rounded-xl uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          {isGeneratingCandidates ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" />
+                          ) : (
+                            <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                          )}
+                          <span>Generate</span>
+                        </button>
+                      </div>
+
+                      {/* Candidates Listing */}
+                      <div className="space-y-3 min-h-[220px] bg-slate-900/20 border border-slate-900/60 p-4 rounded-xl flex flex-col justify-center">
+                        {isGeneratingCandidates ? (
+                          <div className="text-center py-12 space-y-3">
+                            <Loader2 className="w-8 h-8 animate-spin text-rose-500 mx-auto" />
+                            <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest animate-pulse">
+                              Evaluating dynamic resume database streams...
+                            </p>
+                          </div>
+                        ) : candidatesList.length > 0 ? (
+                          <div className="space-y-2.5">
+                            <span className="text-[8px] font-mono text-rose-400 uppercase tracking-widest font-black block">
+                              MAMTA AI SOURCED CANDIDATE MATCHES (✓ READY FOR CONTRACT)
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {candidatesList.map((cand, index) => (
+                                <div 
+                                  key={index} 
+                                  className="p-3 bg-slate-950 border border-slate-900/80 rounded-xl hover:border-slate-800 transition-all flex flex-col justify-between space-y-2.5"
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xl">{cand.avatar}</span>
+                                      <div>
+                                        <h6 className="text-[11px] font-bold text-slate-200 leading-tight">{cand.name}</h6>
+                                        <span className="text-[7.5px] font-mono text-rose-400 bg-rose-500/5 border border-rose-500/10 px-1 rounded block mt-0.5 w-max">
+                                          {cand.match}% Match Quotient
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <span className="text-[9px] font-mono text-slate-500">
+                                      ₹{Math.floor(cand.salary / 1000)}k/mo
+                                    </span>
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-1">
+                                    {cand.skills.map((skill: string, sIdx: number) => (
+                                      <span key={sIdx} className="text-[7px] font-mono px-1.5 py-0.5 bg-slate-900 border border-slate-800 text-slate-400 rounded">
+                                        {skill}
+                                      </span>
+                                    ))}
+                                  </div>
+
+                                  <button
+                                    onClick={() => hireCandidate(cand)}
+                                    className="w-full py-1.5 bg-slate-900 hover:bg-rose-500 hover:text-slate-950 text-slate-300 font-bold text-[10px] rounded-lg transition-all uppercase tracking-wide cursor-pointer"
+                                  >
+                                    Sign Contract & Hire
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-10 space-y-2">
+                            <Users className="w-8 h-8 text-slate-800 mx-auto" />
+                            <h5 className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
+                              No Active Candidate Pool Generated
+                            </h5>
+                            <p className="text-[9.5px] text-slate-600 font-mono max-w-sm mx-auto leading-relaxed">
+                              Choose a target job role from the selector above and click "Generate" to let Mamta AI dynamically match qualified SaaS specialists.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Tab: Branding Domination & Investor Pitch */}
+              {activeTab === 'branding-pitch' && (
+                <motion.div 
+                  key="tab-branding-pitch"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-6"
+                >
+                  {/* Hero & Intro */}
+                  <div className="bg-gradient-to-r from-indigo-950/20 to-slate-950 border border-slate-900 rounded-2xl p-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-indigo-500/5 to-transparent pointer-events-none" />
+                    <span className="px-2.5 py-0.5 rounded font-mono text-[8px] bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 uppercase font-black tracking-widest">
+                      BRANDING DOMINATION & INVESTOR PITCH
+                    </span>
+                    <h3 className="text-sm font-black text-slate-100 uppercase tracking-wide mt-3">
+                      Mamta AI 1-Click Interactive Pitch Deck Generator
+                    </h3>
+                    <p className="text-[10.5px] text-slate-400 leading-relaxed max-w-2xl mt-1.5 font-mono">
+                      Raise capital and establish a global premium brand. Customize your startup parameters, and let Mamta AI generate high-fidelity presentations with integrated revenue math calculations directly on a slide-by-slide canvas!
+                    </p>
+                  </div>
+
+                  {/* Core Presentation Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left: Input Variables Panel (5 Cols) */}
+                    <div className="lg:col-span-5 bg-slate-950 border border-slate-900 rounded-2xl p-5 space-y-4">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide flex items-center gap-2">
+                          <Settings className="w-4 h-4 text-indigo-400" />
+                          <span>Startup parameters</span>
+                        </h4>
+                        <p className="text-[9px] text-slate-500 font-mono">
+                          Configure values that fuel your brand guidance and investor slides
+                        </p>
+                      </div>
+
+                      <div className="space-y-3 font-mono text-[10px]">
+                        {/* Name */}
+                        <div className="space-y-1.5">
+                          <label className="text-[8.5px] text-slate-400 uppercase block">SaaS Startup Name</label>
+                          <input
+                            type="text"
+                            value={pitchSaaSName}
+                            onChange={(e) => setPitchSaaSName(e.target.value)}
+                            className="w-full px-3 py-1.5 bg-slate-900 border border-slate-900 rounded-lg text-slate-200 focus:outline-none focus:border-indigo-500/30 text-xs"
+                          />
+                        </div>
+
+                        {/* Problem */}
+                        <div className="space-y-1.5">
+                          <label className="text-[8.5px] text-slate-400 uppercase block">The Problem (Market Pain)</label>
+                          <textarea
+                            value={pitchSaaSProblem}
+                            onChange={(e) => setPitchSaaSProblem(e.target.value)}
+                            rows={2}
+                            className="w-full px-3 py-1.5 bg-slate-900 border border-slate-900 rounded-lg text-slate-200 focus:outline-none focus:border-indigo-500/30 text-[10px] resize-none"
+                          />
+                        </div>
+
+                        {/* Solution */}
+                        <div className="space-y-1.5">
+                          <label className="text-[8.5px] text-slate-400 uppercase block">The Solution (Your Edge)</label>
+                          <textarea
+                            value={pitchSaaSSolution}
+                            onChange={(e) => setPitchSaaSSolution(e.target.value)}
+                            rows={2}
+                            className="w-full px-3 py-1.5 bg-slate-900 border border-slate-900 rounded-lg text-slate-200 focus:outline-none focus:border-indigo-500/30 text-[10px] resize-none"
+                          />
+                        </div>
+
+                        {/* Traction */}
+                        <div className="space-y-1.5">
+                          <label className="text-[8.5px] text-slate-400 uppercase block">Current SaaS Traction</label>
+                          <input
+                            type="text"
+                            value={pitchSaaSTraction}
+                            onChange={(e) => setPitchSaaSTraction(e.target.value)}
+                            className="w-full px-3 py-1.5 bg-slate-900 border border-slate-900 rounded-lg text-slate-200 focus:outline-none focus:border-indigo-500/30 text-xs"
+                          />
+                        </div>
+
+                        {/* Target ARR */}
+                        <div className="space-y-1.5">
+                          <label className="text-[8.5px] text-slate-400 uppercase block">12-Month Target Goal</label>
+                          <input
+                            type="text"
+                            value={pitchSaaSTarget}
+                            onChange={(e) => setPitchSaaSTarget(e.target.value)}
+                            className="w-full px-3 py-1.5 bg-slate-900 border border-slate-900 rounded-lg text-slate-200 focus:outline-none focus:border-indigo-500/30 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={generateInvestorPitchDeck}
+                        disabled={isGeneratingPitch}
+                        className="w-full py-2.5 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-slate-950 font-black text-xs rounded-xl uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        {isGeneratingPitch ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 text-slate-950" />
+                        )}
+                        <span>Compile Premium Pitch Deck</span>
+                      </button>
+                    </div>
+
+                    {/* Right: Slide Canvas Deck Simulator (7 Cols) */}
+                    <div className="lg:col-span-7 bg-slate-950 border border-slate-900 rounded-2xl p-5 flex flex-col justify-between min-h-[430px]">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center gap-4">
+                          <div>
+                            <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide flex items-center gap-2">
+                              <Megaphone className="w-4 h-4 text-indigo-400" />
+                              <span>Live Deck Monitor</span>
+                            </h4>
+                            <p className="text-[9px] text-slate-500 font-mono">
+                              Interactive slider demonstrating real-time investor ready visuals
+                            </p>
+                          </div>
+                          <span className="font-mono text-[9px] px-2 py-0.5 bg-slate-900 border border-slate-800 text-indigo-400 rounded-full">
+                            Slide {activeSlideIndex + 1} of {pitchDeckSlides.length}
+                          </span>
+                        </div>
+
+                        {/* Slide Canvas */}
+                        <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-6 relative min-h-[250px] flex flex-col justify-between overflow-hidden shadow-2xl">
+                          {/* Accent lights */}
+                          <div className="absolute -top-12 -left-12 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
+                          <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
+
+                          {/* Slide Header */}
+                          <div className="flex justify-between items-center relative z-10 border-b border-slate-900/60 pb-3">
+                            <span className="text-[8px] font-mono tracking-widest text-indigo-400 uppercase font-black bg-indigo-500/10 border border-indigo-500/10 px-2 py-0.5 rounded">
+                              {pitchDeckSlides[activeSlideIndex]?.category || "STARTUP DECK"}
+                            </span>
+                            <span className="text-[7.5px] font-mono text-slate-600 uppercase">
+                              Confidential Pitch ● Mamta AI Core
+                            </span>
+                          </div>
+
+                          {/* Slide Body */}
+                          <div className="py-6 relative z-10 space-y-3.5">
+                            <h5 className="text-base font-black text-slate-100 tracking-tight leading-snug">
+                              {pitchDeckSlides[activeSlideIndex]?.title}
+                            </h5>
+
+                            {pitchDeckSlides[activeSlideIndex]?.subtitle && (
+                              <p className="text-xs text-slate-400 font-mono leading-relaxed">
+                                {pitchDeckSlides[activeSlideIndex].subtitle}
+                              </p>
+                            )}
+
+                            {pitchDeckSlides[activeSlideIndex]?.problem && (
+                              <p className="text-[11px] text-rose-400 bg-rose-500/5 border border-rose-500/10 p-3 rounded-xl font-mono leading-relaxed">
+                                ❌ <strong>The Market Pain:</strong> {pitchDeckSlides[activeSlideIndex].problem}
+                              </p>
+                            )}
+
+                            {pitchDeckSlides[activeSlideIndex]?.solution && (
+                              <p className="text-[11px] text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-xl font-mono leading-relaxed">
+                                🚀 <strong>The Mamta Edge:</strong> {pitchDeckSlides[activeSlideIndex].solution}
+                              </p>
+                            )}
+
+                            {pitchDeckSlides[activeSlideIndex]?.detail && (
+                              <div className="space-y-2">
+                                <p className="text-[11.5px] text-slate-300 leading-relaxed font-mono">
+                                  {pitchDeckSlides[activeSlideIndex].detail}
+                                </p>
+                                <div className="p-3.5 bg-slate-950 border border-slate-900 rounded-xl grid grid-cols-2 gap-4 font-mono text-[10px]">
+                                  <div>
+                                    <span className="text-slate-500 block uppercase text-[7.5px]">Subscriber Goal</span>
+                                    <span className="text-slate-200 font-black text-xs">{calcSubscribers} Active Users</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-500 block uppercase text-[7.5px]">Gross ARR Projected</span>
+                                    <span className="text-emerald-400 font-black text-xs">
+                                      ₹{((calcSubscribers * calcPrice * 12) / 100000).toFixed(2)} Lakhs
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {pitchDeckSlides[activeSlideIndex]?.traction && (
+                              <div className="p-3 bg-indigo-500/5 border border-indigo-500/10 rounded-xl space-y-1.5 font-mono">
+                                <span className="text-[8px] text-indigo-400 uppercase font-black tracking-wider block">Verified Platform Traction</span>
+                                <p className="text-[11px] text-slate-300 leading-relaxed">{pitchDeckSlides[activeSlideIndex].traction}</p>
+                              </div>
+                            )}
+
+                            {pitchDeckSlides[activeSlideIndex]?.team && (
+                              <div className="space-y-2 font-mono">
+                                <p className="text-[11px] text-slate-400 leading-relaxed">{pitchDeckSlides[activeSlideIndex].team}</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {teamMembers.map((m) => (
+                                    <span key={m.id} className="px-2 py-0.5 bg-slate-950 border border-slate-900 text-[8px] text-slate-300 rounded-md">
+                                      {m.avatar || "💼"} {m.name} ({m.role})
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {pitchDeckSlides[activeSlideIndex]?.nextSteps && (
+                              <p className="text-xs text-slate-300 leading-relaxed font-mono">
+                                ➔ {pitchDeckSlides[activeSlideIndex].nextSteps}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Slide Footer */}
+                          <div className="border-t border-slate-900/60 pt-2.5 flex justify-between items-center text-[7.5px] font-mono text-slate-600 relative z-10">
+                            <span>MAMTA SAAS EMPIRE PITCH ENGINE</span>
+                            <span>© {new Date().getFullYear()} ALL RIGHTS RESERVED</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Presentation Nav controls */}
+                      <div className="flex gap-2.5 mt-5">
+                        <button
+                          disabled={activeSlideIndex === 0}
+                          onClick={() => setActiveSlideIndex(p => Math.max(0, p - 1))}
+                          className="flex-1 py-2 bg-slate-900 hover:bg-slate-850 disabled:opacity-40 text-slate-300 hover:text-white rounded-xl text-[10.5px] font-mono border border-slate-800 transition-all cursor-pointer"
+                        >
+                          ◀ Previous Slide
+                        </button>
+                        <button
+                          disabled={activeSlideIndex === pitchDeckSlides.length - 1}
+                          onClick={() => setActiveSlideIndex(p => Math.min(pitchDeckSlides.length - 1, p + 1))}
+                          className="flex-1 py-2 bg-slate-900 hover:bg-slate-850 disabled:opacity-40 text-slate-300 hover:text-white rounded-xl text-[10.5px] font-mono border border-slate-800 transition-all cursor-pointer"
+                        >
+                          Next Slide ▶
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Tab: Enterprise Automation */}
+              {activeTab === 'enterprise-automation' && (
+                <motion.div 
+                  key="tab-enterprise-automation"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-6"
+                >
+                  {/* Hero Header */}
+                  <div className="bg-gradient-to-r from-purple-950/20 to-slate-950 border border-slate-900 rounded-2xl p-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-purple-500/5 to-transparent pointer-events-none" />
+                    <span className="px-2.5 py-0.5 rounded font-mono text-[8px] bg-purple-500/10 border border-purple-500/20 text-purple-400 uppercase font-black tracking-widest">
+                      ENTERPRISE AUTOMATION & AUTOPILOT CORE
+                    </span>
+                    <h3 className="text-sm font-black text-slate-100 uppercase tracking-wide mt-3">
+                      Mamta AI Self-Running Automated Business Console
+                    </h3>
+                    <p className="text-[10.5px] text-slate-400 leading-relaxed max-w-2xl mt-1.5 font-mono">
+                      Unleash full autopilot automation over your SaaS startup. Enabling the Autopilot core deploys persistent simulated cron triggers, auto-indexing SEO scrapers, marketing social bots, and self-repairing server loops.
+                    </p>
+                  </div>
+
+                  {/* Automation Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left: Master Controls & Options (5 Cols) */}
+                    <div className="lg:col-span-5 bg-slate-950 border border-slate-900 rounded-2xl p-5 flex flex-col justify-between">
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide flex items-center gap-2">
+                            <Settings className="w-4 h-4 text-purple-400" />
+                            <span>Autopilot Master Command</span>
+                          </h4>
+                          <p className="text-[9px] text-slate-500 font-mono">
+                            Power up or deactivate autonomous background processes
+                          </p>
+                        </div>
+
+                        {/* Master Toggle Power Button */}
+                        <div className="p-4 bg-slate-900/40 border border-slate-900 rounded-2xl flex items-center justify-between gap-4">
+                          <div>
+                            <span className="text-xs font-bold text-slate-100 block">
+                              AUTOPILOT COGNITIVE CORE
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-500 uppercase tracking-widest block mt-0.5">
+                              Status: {isAutopilotEnabled ? (
+                                <strong className="text-purple-400 animate-pulse">● RUNNING ACTIVE</strong>
+                              ) : "● STANDBY"}
+                            </span>
+                          </div>
+
+                          <button
+                            onClick={() => {
+                              setIsAutopilotEnabled(prev => !prev);
+                              const action = !isAutopilotEnabled ? "ENABLED" : "DISABLED";
+                              setAutoLogs(prev => [`[${new Date().toLocaleTimeString()}] !!! AUTOPILOT CORE FORCE-${action} !!!`, ...prev]);
+                              if ((window as any).showToast) {
+                                (window as any).showToast(`Autopilot Master Core ${action}!`, !isAutopilotEnabled ? "success" : "info");
+                              }
+                            }}
+                            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border ${
+                              isAutopilotEnabled 
+                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 animate-pulse' 
+                                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                            }`}
+                          >
+                            {isAutopilotEnabled ? "POWER OFF" : "ACTIVATE CORE"}
+                          </button>
+                        </div>
+
+                        {/* Checklist Options */}
+                        <div className="space-y-2.5 pt-2 font-mono text-[10px]">
+                          <span className="text-[8px] text-slate-500 uppercase tracking-wider font-bold block">
+                            Enabled Autonomous Pipelines
+                          </span>
+
+                          <label className="flex items-center gap-2.5 p-2.5 bg-slate-900/20 border border-slate-900 rounded-xl cursor-pointer hover:bg-slate-900/40 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={autoOptions.socialMedia}
+                              onChange={() => setAutoOptions(p => ({ ...p, socialMedia: !p.socialMedia }))}
+                              className="accent-purple-500"
+                            />
+                            <div>
+                              <span className="text-[10px] text-slate-300 block font-bold">Auto-Social Media Syndication</span>
+                              <span className="text-[7.5px] text-slate-500 block">Drafts and dispatches visual pitches to YouTube and Twitter</span>
+                            </div>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2.5 bg-slate-900/20 border border-slate-900 rounded-xl cursor-pointer hover:bg-slate-900/40 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={autoOptions.seoBlog}
+                              onChange={() => setAutoOptions(p => ({ ...p, seoBlog: !p.seoBlog }))}
+                              className="accent-purple-500"
+                            />
+                            <div>
+                              <span className="text-[10px] text-slate-300 block font-bold">Dynamic Blog SEO Optimizer</span>
+                              <span className="text-[7.5px] text-slate-500 block">Writes daily search engine optimized content for public sitemap</span>
+                            </div>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2.5 bg-slate-900/20 border border-slate-900 rounded-xl cursor-pointer hover:bg-slate-900/40 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={autoOptions.selfHealing}
+                              onChange={() => setAutoOptions(p => ({ ...p, selfHealing: !p.selfHealing }))}
+                              className="accent-purple-500"
+                            />
+                            <div>
+                              <span className="text-[10px] text-slate-300 block font-bold">Webhook Failure Self-Healing</span>
+                              <span className="text-[7.5px] text-slate-500 block">Monitors server endpoints and performs local rollbacks if crashed</span>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-slate-900/60 text-[9px] text-slate-500 font-mono leading-relaxed">
+                        ⚡ <strong className="text-slate-300">Autopilot rule:</strong> When active, background processes trigger automated events to steadily grow simulated traffic and keep security scores optimal.
+                      </div>
+                    </div>
+
+                    {/* Right: Logging Ticker Console (7 Cols) */}
+                    <div className="lg:col-span-7 bg-slate-950 border border-slate-900 rounded-2xl p-5 flex flex-col justify-between min-h-[380px]">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center gap-4">
+                          <div>
+                            <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide flex items-center gap-2">
+                              <Cpu className="w-4 h-4 text-purple-400" />
+                              <span>Live Automation Activities Ledger</span>
+                            </h4>
+                            <p className="text-[9px] text-slate-500 font-mono">
+                              Real-time system events captured by the active Autopilot scheduler
+                            </p>
+                          </div>
+
+                          <button
+                            onClick={() => setAutoLogs([`[${new Date().toLocaleTimeString()}] Console logs cleared. Standby.`])}
+                            className="px-2.5 py-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-lg text-[9.5px] font-mono text-slate-400 hover:text-white transition-colors cursor-pointer"
+                          >
+                            Clear Console
+                          </button>
+                        </div>
+
+                        {/* Console Log Area */}
+                        <div className="bg-slate-900/30 border border-slate-900 rounded-xl p-4 font-mono text-[10px] space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
+                          {autoLogs.map((log, index) => (
+                            <div 
+                              key={index} 
+                              className={`py-1 flex items-start gap-2.5 leading-relaxed border-b border-slate-900/30 last:border-0 ${
+                                log.includes('!!!') 
+                                  ? 'text-purple-400 font-bold bg-purple-500/5 px-2 rounded' 
+                                  : log.includes('Verified') || log.includes('SaaS Ledger')
+                                  ? 'text-emerald-400' 
+                                  : 'text-slate-300'
+                              }`}
+                            >
+                              <span className="text-slate-600 select-none shrink-0">&gt;</span>
+                              <span>{log}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Manual heartbeat injector */}
+                      <button
+                        onClick={() => {
+                          const customHeartbeats = [
+                            "Manual Heartbeat: Synchronized active Redis cache tables.",
+                            "Security Diagnostics: Verified secure API headers are fully compiled.",
+                            "Database Checkpoint: Flushed user session logs to long-term Firestore shard.",
+                            "Revenue Check: Recalculated live affiliate commission payouts ledger."
+                          ];
+                          const randomMsg = customHeartbeats[Math.floor(Math.random() * customHeartbeats.length)];
+                          setAutoLogs(prev => [`[${new Date().toLocaleTimeString()}] ${randomMsg}`, ...prev]);
+                        }}
+                        className="w-full py-2 bg-slate-900 hover:bg-slate-850 border border-slate-850 hover:border-slate-800 rounded-xl text-slate-300 hover:text-white text-[10.5px] font-mono transition-all cursor-pointer mt-4"
+                      >
+                        Inject Diagnostic System Heartbeat
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Tab 10: Global AI Domination (STEP 7) */}
+              {activeTab === 'global-domination' && (
+                <GlobalDominationView 
+                  userProfile={userProfile} 
+                  prompt={prompt}
+                  setPrompt={setPrompt}
+                  setActiveTab={setActiveTab}
+                />
               )}
 
             </AnimatePresence>

@@ -1487,12 +1487,12 @@ export default function LaunchHubView({ sessionId }: LaunchHubViewProps) {
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t border-slate-900/60 mt-1">
                   <div>
-                    <span className="text-md font-extrabold text-slate-100">₹1,499</span>
+                    <span className="text-md font-extrabold text-slate-100">₹999</span>
                     <span className="text-[9px] text-slate-500 font-mono"> / month</span>
                   </div>
                   <button
                     disabled={subscriptionMetrics.planName === "Enterprise Premium"}
-                    onClick={() => handleCreateOrderAndUpgrade('premium', 1499)}
+                    onClick={() => handleCreateOrderAndUpgrade('premium', 999)}
                     className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/10 disabled:text-emerald-400/50 disabled:border-emerald-500/10 text-slate-950 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
                   >
                     {subscriptionMetrics.planName === "Enterprise Premium" ? "Active" : "Upgrade"}

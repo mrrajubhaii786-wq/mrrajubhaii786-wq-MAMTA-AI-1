@@ -2160,6 +2160,21 @@ app.post('/api/payments/upgrade', async (req, res) => {
 
   try {
     const updatedUser = handleUpgradeUser(sessionId, planKey, Number(amount || 0));
+    
+    // Sync to persistent SaaS user database if this session looks like an email
+    const cleanId = sessionId.trim().toLowerCase();
+    if (cleanId.includes('@')) {
+      const targetPlan = planKey.toUpperCase(); // "PRO" or "PREMIUM"
+      const limit = targetPlan === "PREMIUM" ? 999999 : targetPlan === "PRO" ? 1000 : 10;
+      const credits = targetPlan === "PREMIUM" ? 999999 : targetPlan === "PRO" ? 1000 : 10;
+      await updateSaasUser(cleanId, {
+        plan: targetPlan,
+        limit: limit,
+        credits: credits,
+        usage: 0
+      });
+    }
+
     res.json({
       success: true,
       message: `Successfully upgraded to ${planKey}!`,
@@ -2170,12 +2185,23 @@ app.post('/api/payments/upgrade', async (req, res) => {
   }
 });
 
-app.get('/api/payments/dashboard', (req, res) => {
+app.get('/api/payments/dashboard', async (req, res) => {
   const { sessionId } = req.query;
   if (!sessionId) return res.status(400).json({ error: 'sessionId query parameter is required' });
 
   try {
-    const user = getOrCreateUser(String(sessionId));
+    const cleanId = String(sessionId).trim().toLowerCase();
+    const user = getOrCreateUser(cleanId);
+    
+    // If sessionId is an email, fetch SaaS user and sync to SubscriptionService in real-time
+    if (cleanId.includes('@')) {
+      const saasUser = await getSaasUser(cleanId);
+      const mappedPlanKey = saasUser.plan === "PREMIUM" ? "premium" : saasUser.plan === "PRO" ? "pro" : "free";
+      
+      user.planKey = mappedPlanKey;
+      user.usageCount = saasUser.usage || 0;
+    }
+    
     const dashboardStats = getDashboard(user);
     res.json(dashboardStats);
   } catch (err: any) {
@@ -4698,6 +4724,11 @@ app.post("/api/saas/payments/upgrade", async (req, res) => {
       credits: credits,
       usage: 0
     });
+    
+    // Sync to workspace subscription state immediately
+    const workspacePlanKey = targetPlan === "PREMIUM" ? "premium" : targetPlan === "PRO" ? "pro" : "free";
+    const paymentAmount = targetPlan === "PREMIUM" ? 999 : targetPlan === "PRO" ? 499 : 0;
+    handleUpgradeUser(cleanEmail, workspacePlanKey, paymentAmount);
     
     res.json({
       success: true,

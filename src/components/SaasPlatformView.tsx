@@ -58,7 +58,7 @@ export default function SaasPlatformView({ sessionId }: SaasPlatformViewProps) {
   const [userProfile, setUserProfile] = useState<any>(null);
 
   // Active Screen Tab
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'ai-tool' | 'billing' | 'docs' | 'analytics' | 'affiliate' | 'team-scaling' | 'branding-pitch' | 'enterprise-automation' | 'global-domination'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'ai-tool' | 'billing' | 'docs' | 'analytics' | 'team-scaling' | 'branding-pitch' | 'enterprise-automation' | 'global-domination'>('dashboard');
 
   // Project versioning states (Step 6 Version Control System)
   const [projectVersions, setProjectVersions] = useState<any[]>([]);
@@ -1146,17 +1146,7 @@ export default function SaasPlatformView({ sessionId }: SaasPlatformViewProps) {
                 <span>Analytics</span>
               </button>
 
-              <button
-                onClick={() => setActiveTab('affiliate')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
-                  activeTab === 'affiliate' 
-                    ? 'bg-teal-500/10 text-teal-400 border-teal-500/15' 
-                    : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
-                }`}
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>Affiliate</span>
-              </button>
+
 
               <button
                 onClick={() => setActiveTab('docs')}
@@ -2407,134 +2397,7 @@ export default function SaasPlatformView({ sessionId }: SaasPlatformViewProps) {
                 </motion.div>
               )}
 
-              {/* Tab 6: Affiliate Program */}
-              {activeTab === 'affiliate' && (
-                <motion.div 
-                  key="tab-affiliate"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="space-y-6"
-                >
-                  <div className="bg-gradient-to-r from-teal-950/20 to-slate-950 border border-slate-900 rounded-2xl p-6 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-teal-500/5 to-transparent pointer-events-none" />
-                    <span className="px-2.5 py-0.5 rounded font-mono text-[8px] bg-teal-500/10 border border-teal-500/20 text-teal-400 uppercase font-black tracking-widest">
-                      MAMTA REVENUE SHARE
-                    </span>
-                    <h3 className="text-sm font-black text-slate-100 uppercase tracking-wide mt-3">
-                      Mamta AI High-Yield Affiliate Partnership Program
-                    </h3>
-                    <p className="text-[10.5px] text-slate-400 leading-relaxed max-w-2xl mt-1.5 font-mono">
-                      Join our mission to democratize website creation! Refer founders, designers, and developers to Mamta AI. For every single active member who signs up using your affiliate credentials and upgrades, you receive <strong className="text-emerald-400">₹50 in real cash payout commissions</strong>.
-                    </p>
-                  </div>
 
-                  {/* Core Referral Link & Claim Earnings Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Left: Your Affiliate Link Card */}
-                    <div className="bg-slate-950 border border-slate-900 rounded-2xl p-5 space-y-4">
-                      <div>
-                        <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide">
-                          Your Unique Referral Link
-                        </h4>
-                        <p className="text-[9px] text-slate-500 font-mono">
-                          Share this link across social media (Twitter, LinkedIn) to earn recurring commissions
-                        </p>
-                      </div>
-
-                      <div className="flex gap-2 font-mono">
-                        <input
-                          type="text"
-                          readOnly
-                          value={`https://mamta.ai/join?ref=${userProfile?.email || 'partner'}`}
-                          className="flex-1 px-3 py-2 bg-slate-900 border border-slate-900 rounded-lg text-[10px] text-emerald-400 select-all outline-none"
-                        />
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(`https://mamta.ai/join?ref=${userProfile?.email || 'partner'}`);
-                            if ((window as any).showToast) {
-                              (window as any).showToast("✓ Referral link copied to clipboard!", "success");
-                            }
-                          }}
-                          className="px-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-lg text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
-                        >
-                          Copy
-                        </button>
-                      </div>
-
-                      {/* Invite Banner Generator */}
-                      <div className="bg-slate-900/40 border border-slate-900 p-4 rounded-xl space-y-3">
-                        <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block">
-                          Micro Email Invitation Form
-                        </span>
-                        <div className="flex gap-2">
-                          <input
-                            type="email"
-                            value={friendEmail}
-                            onChange={(e) => setFriendEmail(e.target.value)}
-                            placeholder="invitee-founder@gmail.com"
-                            className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-900 rounded-lg text-[10px] font-mono text-slate-200 focus:outline-none focus:border-teal-500/30"
-                          />
-                          <button
-                            onClick={handleReferFriend}
-                            disabled={isReferring || !friendEmail}
-                            className="px-4 py-1.5 bg-teal-500 hover:bg-teal-400 disabled:opacity-40 text-slate-950 font-black text-xs rounded-lg transition-colors flex items-center justify-center gap-1"
-                          >
-                            {isReferring ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                            <span>Invite</span>
-                          </button>
-                        </div>
-                        {referralSuccess && (
-                          <p className="text-[8px] font-mono text-emerald-400">
-                            ✓ Invitation sent successfully! +20 platform credits credited to your account!
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Right: Claim Commission Earnings */}
-                    <div className="bg-slate-950 border border-slate-900 rounded-2xl p-5 flex flex-col justify-between">
-                      <div className="space-y-3">
-                        <div>
-                          <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide">
-                            Affiliate Commissions Ledger
-                          </h4>
-                          <p className="text-[9px] text-slate-500 font-mono">
-                            Request real-time withdrawals of your earned referral share
-                          </p>
-                        </div>
-
-                        {/* Earnings figures */}
-                        <div className="grid grid-cols-2 gap-4 py-2 font-mono">
-                          <div className="p-3 bg-slate-900/40 border border-slate-900 rounded-xl">
-                            <span className="text-[9px] text-slate-500 block">Total Referrals</span>
-                            <strong className="text-lg text-slate-100">{userProfile?.referralCount || 0} Leads</strong>
-                          </div>
-                          <div className="p-3 bg-slate-900/40 border border-slate-900 rounded-xl">
-                            <span className="text-[9px] text-slate-500 block">Claimable Cash</span>
-                            <strong className="text-lg text-emerald-400">₹{(userProfile?.referralCount || 0) * 50} INR</strong>
-                          </div>
-                        </div>
-
-                        {claimSuccessMsg && (
-                          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-[10px] font-mono leading-relaxed">
-                            {claimSuccessMsg}
-                          </div>
-                        )}
-                      </div>
-
-                      <button
-                        onClick={handleClaimEarnings}
-                        disabled={claimStatus === 'claiming' || (userProfile?.referralCount || 0) === 0}
-                        className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:from-slate-900 disabled:to-slate-900 disabled:text-slate-500 text-slate-950 font-black text-xs rounded-xl uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer mt-4"
-                      >
-                        {claimStatus === 'claiming' ? <Loader2 className="w-4 h-4 animate-spin text-slate-950" /> : null}
-                        <span>Instant Withdrawal to UPI/Bank (₹{(userProfile?.referralCount || 0) * 50})</span>
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
 
               {/* Tab: Team Scaling / Hiring */}
               {activeTab === 'team-scaling' && (

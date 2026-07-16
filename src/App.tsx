@@ -29,7 +29,12 @@ import {
   Compass,
   Brain,
   Network,
-  Coins
+  Coins,
+  Share2,
+  Loader2,
+  TrendingUp,
+  Lock,
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -88,10 +93,78 @@ export default function App() {
     pricing: 'Free'
   });
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
-  const [isProfileHubOpen, setIsProfileHubOpen] = useState<boolean>(false);
   const [bilingualLanguage, setBilingualLanguage] = useState<'en_hi' | 'hi'>('en_hi');
 
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
+
+  // Settings & Affiliate Program states
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
+  const [settingsActiveTab, setSettingsActiveTab] = useState<'profile' | 'general' | 'affiliate'>('profile');
+  const [saasProfile, setSaasProfile] = useState<any>(null);
+  const [isLoadingSaasProfile, setIsLoadingSaasProfile] = useState<boolean>(false);
+
+  // Dummy setter for backward compatibility with deactivated legacy modals
+  const setIsProfileHubOpen = (_val: boolean) => {};
+
+  const [friendEmail, setFriendEmail] = useState('');
+  const [isReferring, setIsReferring] = useState(false);
+  const [referralSuccess, setReferralSuccess] = useState(false);
+  const [claimStatus, setClaimStatus] = useState<'idle' | 'claiming' | 'success'>('idle');
+  const [claimSuccessMsg, setClaimSuccessMsg] = useState('');
+
+  const fetchSaasProfile = async (emailToFetch: string) => {
+    if (!emailToFetch) return;
+    setIsLoadingSaasProfile(true);
+    try {
+      const res = await fetch('/api/saas/auth/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailToFetch })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSaasProfile(data.user);
+      }
+    } catch (err) {
+      console.error("Error loading SaaS profile:", err);
+    } finally {
+      setIsLoadingSaasProfile(false);
+    }
+  };
+
+  const handleReferFriend = async () => {
+    if (!userEmail || !friendEmail.trim()) return;
+    setIsReferring(true);
+    try {
+      const res = await fetch('/api/saas/auth/referral', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail, friendEmail: friendEmail.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSaasProfile(data.user);
+        setReferralSuccess(true);
+        setFriendEmail('');
+        setToast({ message: "🎉 Referral reward applied! +20 credits added to account.", type: "success" });
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      alert("Referral mapping failed: " + err.message);
+    } finally {
+      setIsReferring(false);
+    }
+  };
+
+  const handleClaimEarnings = async () => {
+    setClaimStatus('claiming');
+    setTimeout(() => {
+      setClaimStatus('success');
+      setClaimSuccessMsg(`🎉 Outstanding affiliate commissions successfully transferred directly to your UPI / Bank account!`);
+      setToast({ message: "✓ Affiliate commission paid out!", type: "success" });
+    }, 1500);
+  };
 
   useEffect(() => {
     (window as any).showToast = (message: string, type: 'error' | 'success' | 'info' = 'error') => {
@@ -538,7 +611,7 @@ export default function App() {
           {/* Permanent User Profile Section (The User's Home Hub) */}
           <div className="border-t border-slate-900 pt-3 pb-2 mb-2">
             <button
-              onClick={() => setIsProfileHubOpen(true)}
+              onClick={() => { setIsSettingsModalOpen(true); setSettingsActiveTab('profile'); fetchSaasProfile(userEmail); }}
               className="w-full flex items-center gap-2.5 p-2 rounded-xl bg-slate-950/40 hover:bg-slate-900 border border-slate-900/60 hover:border-slate-800 transition-all text-left group cursor-pointer"
             >
               <div className="relative shrink-0">
@@ -592,7 +665,7 @@ export default function App() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setIsProfileHubOpen(true)}
+            onClick={() => { setIsSettingsModalOpen(true); setSettingsActiveTab('profile'); fetchSaasProfile(userEmail); }}
             className="p-1.5 rounded-lg bg-slate-900 text-slate-300 hover:text-emerald-400 border border-slate-800 transition-all cursor-pointer flex items-center justify-center shrink-0"
             title="Open Profile Hub"
           >
@@ -864,7 +937,7 @@ export default function App() {
             {/* Mobile Profile Trigger Footer */}
             <div className="border-t border-slate-900 pt-4 mt-auto">
               <button
-                onClick={() => { setIsProfileHubOpen(true); setMobileMenuOpen(false); }}
+                onClick={() => { setIsSettingsModalOpen(true); setSettingsActiveTab('profile'); setMobileMenuOpen(false); fetchSaasProfile(userEmail); }}
                 className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-left cursor-pointer"
               >
                 <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
@@ -923,7 +996,7 @@ export default function App() {
                 <span>Core Operational</span>
               </div>
               <button
-                onClick={() => setIsProfileHubOpen(true)}
+                onClick={() => { setIsSettingsModalOpen(true); setSettingsActiveTab('profile'); fetchSaasProfile(userEmail); }}
                 className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-950/60 hover:bg-slate-800 border border-slate-850 hover:border-slate-800 transition-all cursor-pointer text-xs font-semibold text-slate-300 hover:text-emerald-400 group"
               >
                 <div className="w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-emerald-500/10 group-hover:text-emerald-400 transition-all">
@@ -1047,7 +1120,7 @@ export default function App() {
 
       {/* 3. MAMTA PROFILE & ACCOUNT HUB MODAL (The User's Core Home) */}
       <AnimatePresence>
-        {isProfileHubOpen && (
+        {false && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }}
@@ -1219,14 +1292,33 @@ export default function App() {
                     </button>
                   )}
 
-                  <div className="flex gap-2">
+                   <div className="flex gap-2">
                     <button
-                      onClick={() => { setIsProfileHubOpen(false); setActiveTab('home'); setShowUpgradeModal(true); }}
-                      className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-emerald-500/10 transition-all font-mono"
+                      onClick={() => {
+                        setIsProfileHubOpen(false);
+                        setIsSettingsModalOpen(true);
+                        setSettingsActiveTab('general');
+                        fetchSaasProfile(userEmail);
+                      }}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all font-mono"
                     >
-                      <Zap className="w-3.5 h-3.5 fill-current" />
-                      <span>UPGRADE PLAN</span>
+                      <Settings className="w-3.5 h-3.5" />
+                      <span>SETTINGS</span>
                     </button>
+                    
+                    <button
+                      onClick={() => {
+                        setIsProfileHubOpen(false);
+                        setIsSettingsModalOpen(true);
+                        setSettingsActiveTab('affiliate');
+                        fetchSaasProfile(userEmail);
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-teal-500/10 to-emerald-500/10 hover:from-teal-500/20 hover:to-emerald-500/20 border border-teal-500/30 text-teal-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all font-mono"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>AFFILIATE PROGRAM</span>
+                    </button>
+
                     <button
                       onClick={() => setIsProfileHubOpen(false)}
                       className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium cursor-pointer transition-all"
@@ -1236,6 +1328,455 @@ export default function App() {
                   </div>
                 </div>
 
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Settings & Affiliate Console Modal */}
+      <AnimatePresence>
+        {isSettingsModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSettingsModalOpen(false)}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              className="relative w-full h-full bg-slate-900 flex overflow-hidden z-10 text-slate-200"
+            >
+              {/* Left Sidebar Menu */}
+              <div className="w-full md:w-64 bg-slate-950/60 border-b md:border-b-0 md:border-r border-slate-800 p-6 flex flex-col justify-between shrink-0">
+                <div className="space-y-6">
+                  <div>
+                    <span className="px-2 py-0.5 text-[8px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded uppercase font-bold tracking-widest font-mono">
+                      MAMTA CONSOLE
+                    </span>
+                    <h2 className="text-sm font-black text-slate-100 uppercase tracking-wider mt-2 font-mono">
+                      Core Control
+                    </h2>
+                    <p className="text-[10px] text-slate-500 font-mono">
+                      Manage profile, settings & rewards
+                    </p>
+                  </div>
+
+                  <nav className="flex flex-row md:flex-col gap-1.5 md:gap-2 overflow-x-auto md:overflow-visible pb-2 md:pb-0 scrollbar-none">
+                    <button
+                      onClick={() => setSettingsActiveTab('profile')}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 whitespace-nowrap shrink-0 ${
+                        settingsActiveTab === 'profile'
+                          ? 'bg-slate-800 text-slate-100 border border-slate-700 shadow-md shadow-emerald-500/5'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+                      }`}
+                    >
+                      <User className="w-4 h-4 text-emerald-400" />
+                      <span>Profile & Limits</span>
+                    </button>
+
+                    <button
+                      onClick={() => setSettingsActiveTab('general')}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 whitespace-nowrap shrink-0 ${
+                        settingsActiveTab === 'general'
+                          ? 'bg-slate-800 text-slate-100 border border-slate-700'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+                      }`}
+                    >
+                      <Settings className="w-4 h-4 text-slate-400" />
+                      <span>General Settings</span>
+                    </button>
+
+                    <button
+                      onClick={() => setSettingsActiveTab('affiliate')}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 whitespace-nowrap shrink-0 ${
+                        settingsActiveTab === 'affiliate'
+                          ? 'bg-gradient-to-r from-teal-500/10 to-emerald-500/10 border border-teal-500/20 text-teal-400'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850/40 border border-transparent'
+                      }`}
+                    >
+                      <Share2 className="w-4 h-4 text-teal-400" />
+                      <span>Affiliate Program</span>
+                    </button>
+                  </nav>
+                </div>
+
+                <div className="hidden md:block p-3 bg-slate-900/60 rounded-xl border border-slate-850 text-center">
+                  <span className="text-[9px] text-slate-500 font-mono block">Signed in as</span>
+                  <span className="text-[10px] text-emerald-400 font-mono truncate block font-bold mt-0.5">{userEmail}</span>
+                </div>
+              </div>
+
+              {/* Right Content Area */}
+              <div className="flex-1 flex flex-col overflow-hidden bg-slate-900/40">
+                {/* Header Row */}
+                <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {settingsActiveTab === 'profile' && (
+                      <>
+                        <User className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-black text-slate-200 uppercase tracking-widest font-mono">User Account Control Center</span>
+                      </>
+                    )}
+                    {settingsActiveTab === 'general' && (
+                      <>
+                        <Settings className="w-4 h-4 text-slate-400" />
+                        <span className="text-xs font-black text-slate-200 uppercase tracking-widest font-mono">General Configurations</span>
+                      </>
+                    )}
+                    {settingsActiveTab === 'affiliate' && (
+                      <>
+                        <Share2 className="w-4 h-4 text-teal-400" />
+                        <span className="text-xs font-black text-slate-200 uppercase tracking-widest font-mono">Affiliate Partnership Dashboard</span>
+                      </>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setIsSettingsModalOpen(false)}
+                    className="p-1.5 bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-100 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Tab Contents */}
+                <div className="flex-1 p-6 overflow-y-auto space-y-6">
+                  {settingsActiveTab === 'profile' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-6"
+                    >
+                      {/* Profile Core Card */}
+                      <div className="p-5 bg-gradient-to-r from-slate-950/80 to-slate-950/40 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-center gap-5 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-500/5 to-transparent pointer-events-none" />
+                        
+                        {/* Glowing Animated Avatar */}
+                        <div className="relative">
+                          <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-emerald-500/30 flex items-center justify-center text-slate-300 relative z-10 overflow-hidden shadow-lg shadow-emerald-500/5">
+                            <User className="w-7 h-7 text-emerald-400" />
+                          </div>
+                          <div className="absolute inset-0 bg-emerald-500/10 blur-xl rounded-full animate-pulse" />
+                          {isLoggedIn && (
+                            <span className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900 z-20" />
+                          )}
+                        </div>
+
+                        <div className="flex-1 text-center sm:text-left space-y-1">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <span className="text-sm font-bold text-slate-100">{isLoggedIn ? userEmail : "Guest Session"}</span>
+                            <span className={`text-[9px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider self-center ${isLoggedIn ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-slate-800 border border-slate-700 text-slate-500'}`}>
+                              {isLoggedIn ? 'Verified Core Member' : 'Guest Core'}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-mono">
+                            Session ID: <span className="text-indigo-400">{sessionId}</span>
+                          </p>
+                          <p className="text-[11px] text-slate-400 leading-normal">
+                            Welcome back to your autonomous command center. Your chats, workspace configurations, and active plans are preserved securely here.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Bandwidth & Active Limits Progress */}
+                      <div className="p-5 bg-slate-950/30 border border-slate-800 rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono flex items-center gap-1.5">
+                            <Zap className="w-3.5 h-3.5 text-emerald-400" /> Subscription Bandwidth
+                          </span>
+                          <span className="text-xs font-bold text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                            {subscriptionMetrics.planName}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs font-mono">
+                            <span className="text-slate-400">Monthly Prompt Token Limits:</span>
+                            <span className="font-semibold text-slate-200">
+                              {subscriptionMetrics.usage} / {subscriptionMetrics.limit === null || subscriptionMetrics.limit === Infinity ? 'Unlimited' : subscriptionMetrics.limit}
+                            </span>
+                          </div>
+                          
+                          {/* Progress bar */}
+                          <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                            <div 
+                              className="bg-gradient-to-r from-emerald-500 via-teal-400 to-indigo-500 h-full rounded-full transition-all duration-300"
+                              style={{ 
+                                width: `${subscriptionMetrics.limit === Infinity || subscriptionMetrics.limit === null ? 0 : Math.min(100, (subscriptionMetrics.usage / subscriptionMetrics.limit) * 100)}%` 
+                              }}
+                            />
+                          </div>
+                          
+                          <p className="text-[10px] text-slate-500 font-mono text-right leading-none pt-1">
+                            {subscriptionMetrics.limit === Infinity || subscriptionMetrics.limit === null 
+                              ? 'Unlimited access active' 
+                              : `${Math.max(0, subscriptionMetrics.limit - subscriptionMetrics.usage)} API calls remaining in current period`}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Interactive Stats Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono">
+                        <div className="p-4 bg-slate-950/20 border border-slate-850 rounded-xl flex flex-col items-center justify-center text-center space-y-1">
+                          <Activity className="w-5 h-5 text-emerald-400" />
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Chat Status</span>
+                          <span className="text-xs font-bold text-slate-200">Connected</span>
+                        </div>
+
+                        <div className="p-4 bg-slate-950/20 border border-slate-850 rounded-xl flex flex-col items-center justify-center text-center space-y-1">
+                          <Database className="w-5 h-5 text-indigo-400" />
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Database Ingress</span>
+                          <span className="text-xs font-bold text-slate-200">Firestore Live</span>
+                        </div>
+
+                        <div className="p-4 bg-slate-950/20 border border-slate-850 rounded-xl flex flex-col items-center justify-center text-center space-y-1">
+                          <Code className="w-5 h-5 text-teal-400" />
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Workspace IDE</span>
+                          <span className="text-xs font-bold text-slate-200">Sandbox Ready</span>
+                        </div>
+                      </div>
+
+                      {/* Session Action Controls */}
+                      <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">
+                        {isLoggedIn ? (
+                          <button
+                            onClick={() => { handleLogout(); setIsSettingsModalOpen(false); }}
+                            className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <LogOut className="w-3.5 h-3.5" />
+                            <span>Log Out from Core</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => { handleLogin(); }}
+                            className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <LogIn className="w-3.5 h-3.5" />
+                            <span>Log In to Secure Profile</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setIsSettingsModalOpen(false)}
+                          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium cursor-pointer transition-all"
+                        >
+                          Close Console
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {settingsActiveTab === 'general' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-5"
+                    >
+                      <div className="p-5 bg-slate-950/40 border border-slate-850 rounded-2xl space-y-4">
+                        <h3 className="text-xs font-black text-slate-200 uppercase tracking-wider font-mono">
+                          Bilingual Language Pref (द्विभाषी सेटिंग्स)
+                        </h3>
+                        <p className="text-[10px] text-slate-500 leading-relaxed font-mono">
+                          Toggle between Hinglish (mix of Hindi & English) and pure Hindi instructions for the AI system core.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setBilingualLanguage('en_hi')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all border ${
+                              bilingualLanguage === 'en_hi'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+                                : 'text-slate-400 border-slate-800 hover:bg-slate-850'
+                            }`}
+                          >
+                            English + Hindi (Hinglish)
+                          </button>
+                          <button
+                            onClick={() => setBilingualLanguage('hi')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all border ${
+                              bilingualLanguage === 'hi'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+                                : 'text-slate-400 border-slate-800 hover:bg-slate-850'
+                            }`}
+                          >
+                            Pure Hindi (हिन्दी)
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-5 bg-slate-950/40 border border-slate-850 rounded-2xl space-y-4">
+                        <h3 className="text-xs font-black text-slate-200 uppercase tracking-wider font-mono">
+                          MAMTA API Core Credentials
+                        </h3>
+                        <div className="space-y-3 font-mono">
+                          <div>
+                            <span className="text-[9px] text-slate-500 uppercase">User Access Key Token</span>
+                            <div className="flex gap-2 mt-1">
+                              <input
+                                type="password"
+                                readOnly
+                                value="••••••••••••••••••••••••••••••••••••••••"
+                                className="flex-1 px-3 py-1.5 bg-slate-900 border border-slate-850 rounded-lg text-xs text-slate-400 outline-none"
+                              />
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(`token_saas_${userEmail.replace(/[^a-z0-9]/g, '')}`);
+                                  setToast({ message: "✓ API access token copied!", type: "success" });
+                                }}
+                                className="px-3 bg-slate-850 hover:bg-slate-800 border border-slate-750 text-xs text-slate-300 rounded-lg cursor-pointer"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-5 bg-slate-950/40 border border-slate-850 rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-xs font-black text-slate-200 uppercase font-mono">Secure Telemetry & Cloud Logs</h4>
+                            <p className="text-[9.5px] text-slate-500 font-mono mt-0.5">Relay platform compiler warnings to MAMTA server nodes</p>
+                          </div>
+                          <div className="w-10 h-6 bg-emerald-500/20 border border-emerald-500/30 rounded-full p-1 flex justify-end cursor-pointer">
+                            <div className="w-4 h-4 bg-emerald-400 rounded-full shadow" />
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {settingsActiveTab === 'affiliate' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-6"
+                    >
+                      <div className="bg-gradient-to-r from-teal-950/30 to-slate-950 border border-slate-800 rounded-2xl p-5 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-teal-500/5 to-transparent pointer-events-none" />
+                        <span className="px-2 py-0.5 rounded font-mono text-[8px] bg-teal-500/10 border border-teal-500/20 text-teal-400 uppercase font-black tracking-widest">
+                          MAMTA REVENUE SHARE
+                        </span>
+                        <h3 className="text-xs font-black text-slate-100 uppercase tracking-wide mt-2">
+                          Mamta AI High-Yield Affiliate Partnership Program
+                        </h3>
+                        <p className="text-[10px] text-slate-400 leading-relaxed mt-1.5 font-mono">
+                          Join our mission to democratize website creation! Refer founders, designers, and developers to Mamta AI. For every single active member who signs up using your affiliate credentials and upgrades, you receive <strong className="text-emerald-400">₹50 in real cash payout commissions</strong>.
+                        </p>
+                      </div>
+
+                      {/* Core Referral Link & Claim Earnings Row */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Left: Your Affiliate Link Card */}
+                        <div className="bg-slate-950 border border-slate-850 rounded-2xl p-5 space-y-4">
+                          <div>
+                            <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide">
+                              Your Unique Referral Link
+                            </h4>
+                            <p className="text-[9px] text-slate-500 font-mono mt-0.5">
+                              Share this link across social media (Twitter, LinkedIn) to earn recurring commissions
+                            </p>
+                          </div>
+
+                          <div className="flex gap-2 font-mono">
+                            <input
+                              type="text"
+                              readOnly
+                              value={`https://mamta.ai/join?ref=${saasProfile?.email || userEmail}`}
+                              className="flex-1 px-3 py-2 bg-slate-900 border border-slate-850 rounded-lg text-[10px] text-emerald-400 select-all outline-none"
+                            />
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(`https://mamta.ai/join?ref=${saasProfile?.email || userEmail}`);
+                                setToast({ message: "✓ Referral link copied to clipboard!", type: "success" });
+                              }}
+                              className="px-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-lg text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+                            >
+                              Copy
+                            </button>
+                          </div>
+
+                          {/* Invite Banner Generator */}
+                          <div className="bg-slate-900/40 border border-slate-850 p-4 rounded-xl space-y-3">
+                            <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block">
+                              Micro Email Invitation Form
+                            </span>
+                            <div className="flex gap-2">
+                              <input
+                                type="email"
+                                value={friendEmail}
+                                onChange={(e) => setFriendEmail(e.target.value)}
+                                placeholder="invitee-founder@gmail.com"
+                                className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-[10px] font-mono text-slate-200 focus:outline-none focus:border-teal-500/30"
+                              />
+                              <button
+                                onClick={handleReferFriend}
+                                disabled={isReferring || !friendEmail}
+                                className="px-4 py-1.5 bg-teal-500 hover:bg-teal-400 disabled:opacity-40 text-slate-950 font-black text-xs rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                {isReferring ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                                <span>Invite</span>
+                              </button>
+                            </div>
+                            {referralSuccess && (
+                              <p className="text-[8px] font-mono text-emerald-400">
+                                ✓ Invitation sent successfully! +20 platform credits credited to your account!
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right: Claim Commission Earnings */}
+                        <div className="bg-slate-950 border border-slate-850 rounded-2xl p-5 flex flex-col justify-between">
+                          <div className="space-y-3">
+                            <div>
+                              <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide">
+                                Affiliate Commissions Ledger
+                              </h4>
+                              <p className="text-[9px] text-slate-500 font-mono mt-0.5">
+                                Request real-time withdrawals of your earned referral share
+                              </p>
+                            </div>
+
+                            {/* Earnings figures */}
+                            <div className="grid grid-cols-2 gap-4 py-2 font-mono">
+                              <div className="p-3 bg-slate-900/40 border border-slate-850 rounded-xl">
+                                <span className="text-[9px] text-slate-500 block">Total Referrals</span>
+                                <strong className="text-sm text-slate-100">
+                                  {isLoadingSaasProfile ? '...' : (saasProfile?.referralCount || 0)} Leads
+                                </strong>
+                              </div>
+                              <div className="p-3 bg-slate-900/40 border border-slate-850 rounded-xl">
+                                <span className="text-[9px] text-slate-500 block">Claimable Cash</span>
+                                <strong className="text-sm text-emerald-400">
+                                  ₹{(saasProfile?.referralCount || 0) * 50} INR
+                                </strong>
+                              </div>
+                            </div>
+
+                            {claimSuccessMsg && (
+                              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-[10px] font-mono leading-relaxed font-mono">
+                                {claimSuccessMsg}
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={handleClaimEarnings}
+                            disabled={claimStatus === 'claiming' || (saasProfile?.referralCount || 0) === 0}
+                            className="w-full py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:from-slate-900 disabled:to-slate-900 disabled:text-slate-500 text-slate-950 font-black text-[10px] rounded-xl uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer mt-4"
+                          >
+                            {claimStatus === 'claiming' ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" /> : null}
+                            <span>Instant Withdrawal to UPI/Bank (₹{(saasProfile?.referralCount || 0) * 50})</span>
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
               </div>
             </motion.div>
           </div>

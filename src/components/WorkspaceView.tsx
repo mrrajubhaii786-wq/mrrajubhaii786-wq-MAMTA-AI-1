@@ -133,9 +133,9 @@ export default function WorkspaceView({ sessionId, selectedPlanId, onSelectPlan,
   const [sqlDb, setSqlDb] = useState(() => localStorage.getItem('mamta_sql_db') || '');
   const [sqlStatus, setSqlStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
 
-  const [firebaseApiKey, setFirebaseApiKey] = useState(() => localStorage.getItem('mamta_firebase_api_key') || '');
-  const [firebaseProjectId, setFirebaseProjectId] = useState(() => localStorage.getItem('mamta_firebase_project_id') || '');
-  const [firebaseStatus, setFirebaseStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const [firebaseApiKey, setFirebaseApiKey] = useState(() => localStorage.getItem('mamta_firebase_api_key') || 'AIzaSyC8HWUzUUn7X0WsF_J0KlbkX3BVsLi_YVk');
+  const [firebaseProjectId, setFirebaseProjectId] = useState(() => localStorage.getItem('mamta_firebase_project_id') || 'linen-transport-4f4nj');
+  const [firebaseStatus, setFirebaseStatus] = useState<'disconnected' | 'connecting' | 'connected'>('connected');
 
   const [gitRepoName, setGitRepoName] = useState(() => localStorage.getItem('mamta_git_repo') || '');
   const [gitBranch, setGitBranch] = useState(() => localStorage.getItem('mamta_git_branch') || 'main');

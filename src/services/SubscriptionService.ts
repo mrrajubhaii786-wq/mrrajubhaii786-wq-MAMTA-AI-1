@@ -6,8 +6,8 @@ export interface SubscriptionPlan {
 
 export const subscriptionPlans: Record<string, SubscriptionPlan> = {
   free: { name: "Free Tier", limit: 10, price: 0 },
-  pro: { name: "Pro Developer", limit: 1000, price: 499 }, // INR 499
-  premium: { name: "Enterprise Premium", limit: 999999, price: 999 } // INR 999
+  pro: { name: "MAMTA PRO SAAS", limit: 1000, price: 499 }, // INR 499
+  premium: { name: "ENTERPRISE MAX", limit: 999999, price: 999 } // INR 999
 };
 
 export interface UserSubscriptionState {

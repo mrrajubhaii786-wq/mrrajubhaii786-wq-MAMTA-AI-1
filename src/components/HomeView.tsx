@@ -1889,8 +1889,8 @@ Technical details: \`${errorMessage}\``,
                   <div className="border border-slate-800 hover:border-slate-700 bg-slate-950/40 rounded-xl p-5 flex flex-col transition-all">
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <h4 className="text-xs font-bold text-slate-200">Pro Developer</h4>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Perfect for individual creators</p>
+                        <h4 className="text-xs font-bold text-slate-200">MAMTA PRO SAAS</h4>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Advanced Gemini-3.5-Flash & direct IDE integrations</p>
                       </div>
                       <span className="text-[9px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-md font-mono">POPULAR</span>
                     </div>
@@ -1902,33 +1902,33 @@ Technical details: \`${errorMessage}\``,
                     <ul className="space-y-2.5 my-4 flex-1 text-[11px] text-slate-300">
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span>**100 AI Operations** / month limit</span>
+                        <span>**1,000 High-Quality Synthesis** / month limit</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span>Full Level 10 CEO Decision Engine</span>
+                        <span>Advanced Gemini-3.5-Flash</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span>Stripe & Razorpay auto-routing</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                         <span>Interactive Node runtime executor</span>
                       </li>
-                      <li className="flex items-center gap-2">
-                        <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span>GitHub secure branch push automation</span>
-                      </li>
                     </ul>
 
                     <button
                       type="button"
-                      disabled={isProcessingUpgrade || subscriptionMetrics.planName === "Pro Developer"}
+                      disabled={isProcessingUpgrade || subscriptionMetrics.planName === "MAMTA PRO SAAS"}
                       onClick={() => handleCreateOrderAndUpgrade('pro')}
                       className={`w-full py-2 px-3 text-xs font-semibold rounded-lg text-center transition-all ${
-                        subscriptionMetrics.planName === "Pro Developer"
+                        subscriptionMetrics.planName === "MAMTA PRO SAAS"
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 cursor-not-allowed'
                           : 'bg-emerald-500 hover:bg-emerald-600 text-slate-950 cursor-pointer hover:scale-[1.01]'
                       } disabled:opacity-50`}
                     >
-                      {subscriptionMetrics.planName === "Pro Developer" ? "Active Plan" : isProcessingUpgrade ? "Connecting Gateway..." : "Activate Pro Plan"}
+                      {subscriptionMetrics.planName === "MAMTA PRO SAAS" ? "Active Plan" : isProcessingUpgrade ? "Connecting Gateway..." : "Activate Pro Plan"}
                     </button>
                   </div>
 
@@ -1937,23 +1937,23 @@ Technical details: \`${errorMessage}\``,
                     <div className="absolute -top-2 -right-2 bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 text-[8px] font-bold px-2 py-0.5 rounded font-mono shadow-md uppercase">BEST VALUE</div>
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <h4 className="text-xs font-bold text-slate-200">Enterprise Premium</h4>
-                        <p className="text-[10px] text-slate-400 mt-0.5">For commercial production and teams</p>
+                        <h4 className="text-xs font-bold text-slate-200">ENTERPRISE MAX</h4>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Unlimited AI generations & enterprise scaling</p>
                       </div>
                     </div>
                     <div className="my-3">
-                      <span className="text-xl font-bold text-slate-100">₹1,499</span>
+                      <span className="text-xl font-bold text-slate-100">₹999</span>
                       <span className="text-[10px] text-slate-500 font-mono"> / month</span>
                     </div>
 
                     <ul className="space-y-2.5 my-4 flex-1 text-[11px] text-slate-300">
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span className="font-semibold text-emerald-400">**Infinite AI Operations** limit</span>
+                        <span className="font-semibold text-emerald-400">**Unlimited AI generations** limit</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span>Self-evolution neural training loops</span>
+                        <span>Dedicated Shard Firestore Node</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -1961,21 +1961,21 @@ Technical details: \`${errorMessage}\``,
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span>Dedicated tech-support SLAs</span>
+                        <span>Dedicated support team</span>
                       </li>
                     </ul>
 
                     <button
                       type="button"
-                      disabled={isProcessingUpgrade || subscriptionMetrics.planName === "Enterprise Premium"}
+                      disabled={isProcessingUpgrade || subscriptionMetrics.planName === "ENTERPRISE MAX"}
                       onClick={() => handleCreateOrderAndUpgrade('premium')}
                       className={`w-full py-2 px-3 text-xs font-semibold rounded-lg text-center transition-all ${
-                        subscriptionMetrics.planName === "Enterprise Premium"
+                        subscriptionMetrics.planName === "ENTERPRISE MAX"
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 cursor-not-allowed'
                           : 'bg-emerald-500 hover:bg-emerald-600 text-slate-950 cursor-pointer hover:scale-[1.01]'
                       } disabled:opacity-50`}
                     >
-                      {subscriptionMetrics.planName === "Enterprise Premium" ? "Active Plan" : isProcessingUpgrade ? "Connecting Gateway..." : "Activate Premium Plan"}
+                      {subscriptionMetrics.planName === "ENTERPRISE MAX" ? "Active Plan" : isProcessingUpgrade ? "Connecting Gateway..." : "Activate Premium Plan"}
                     </button>
                   </div>
 

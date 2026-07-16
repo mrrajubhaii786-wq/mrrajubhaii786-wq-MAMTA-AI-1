@@ -4306,10 +4306,12 @@ app.post("/api/saas/auth/referral", async (req, res) => {
     // Add 20 credits reward
     const currentCredits = user.credits !== undefined ? user.credits : 10;
     const currentLimit = user.limit || 10;
+    const currentReferrals = user.referralCount !== undefined ? user.referralCount : 0;
     
     const updatedUser = await updateSaasUser(cleanEmail, {
       credits: currentCredits + 20,
-      limit: currentLimit + 20
+      limit: currentLimit + 20,
+      referralCount: currentReferrals + 1
     });
 
     await logSaasAnalytics(cleanEmail, "referral_invite", `Invited friend ${friendEmail || "anonymous@gmail.com"}`);

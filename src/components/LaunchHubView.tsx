@@ -1445,14 +1445,14 @@ export default function LaunchHubView({ sessionId }: LaunchHubViewProps) {
               <div className="bg-slate-950/80 border border-emerald-500/20 rounded-xl p-4 flex flex-col justify-between transition-all relative">
                 <div className="absolute top-2.5 right-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 text-[8px] font-bold px-1.5 py-0.2 rounded font-mono uppercase">POPULAR</div>
                 <div>
-                  <h4 className="text-xs font-bold text-slate-200">Pro Developer</h4>
-                  <p className="text-[9px] text-slate-400 font-mono mt-0.5">100 operations / month limit</p>
+                  <h4 className="text-xs font-bold text-slate-200">MAMTA PRO SAAS</h4>
+                  <p className="text-[9px] text-slate-400 font-mono mt-0.5">1,000 operations / month limit</p>
                   <ul className="space-y-1 my-2.5 text-[9px] text-slate-400">
                     <li className="flex items-center gap-1.5">
-                      <Check className="w-3 h-3 text-emerald-400" /> Complete Level 10 CEO Decision Engine
+                      <Check className="w-3 h-3 text-emerald-400" /> Advanced Gemini-3.5-Flash
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="w-3 h-3 text-emerald-400" /> Auto DevOps Branch Syncer
+                      <Check className="w-3 h-3 text-emerald-400" /> Stripe & Razorpay auto-routing
                     </li>
                   </ul>
                 </div>
@@ -1462,11 +1462,11 @@ export default function LaunchHubView({ sessionId }: LaunchHubViewProps) {
                     <span className="text-[9px] text-slate-500 font-mono"> / month</span>
                   </div>
                   <button
-                    disabled={subscriptionMetrics.planName === "Pro Developer"}
+                    disabled={subscriptionMetrics.planName === "MAMTA PRO SAAS"}
                     onClick={() => handleCreateOrderAndUpgrade('pro', 499)}
                     className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/10 disabled:text-emerald-400/50 disabled:border-emerald-500/10 text-slate-950 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
                   >
-                    {subscriptionMetrics.planName === "Pro Developer" ? "Active" : "Upgrade"}
+                    {subscriptionMetrics.planName === "MAMTA PRO SAAS" ? "Active" : "Upgrade"}
                   </button>
                 </div>
               </div>
@@ -1474,14 +1474,14 @@ export default function LaunchHubView({ sessionId }: LaunchHubViewProps) {
               {/* Enterprise Premium Tier card */}
               <div className="bg-slate-950/50 border border-slate-900 rounded-xl p-4 flex flex-col justify-between transition-all">
                 <div>
-                  <h4 className="text-xs font-bold text-slate-200">Enterprise Premium</h4>
-                  <p className="text-[9px] text-slate-400 font-mono mt-0.5">Infinite operations limit</p>
+                  <h4 className="text-xs font-bold text-slate-200">ENTERPRISE MAX</h4>
+                  <p className="text-[9px] text-slate-400 font-mono mt-0.5">Unlimited operations limit</p>
                   <ul className="space-y-1 my-2.5 text-[9px] text-slate-400">
                     <li className="flex items-center gap-1.5">
-                      <Check className="w-3 h-3 text-emerald-400" /> Infinite autonomous generations
+                      <Check className="w-3 h-3 text-emerald-400" /> Unlimited AI operations
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="w-3 h-3 text-emerald-400" /> Dedicated SLA developer support
+                      <Check className="w-3 h-3 text-emerald-400" /> Dedicated support team
                     </li>
                   </ul>
                 </div>
@@ -1491,11 +1491,11 @@ export default function LaunchHubView({ sessionId }: LaunchHubViewProps) {
                     <span className="text-[9px] text-slate-500 font-mono"> / month</span>
                   </div>
                   <button
-                    disabled={subscriptionMetrics.planName === "Enterprise Premium"}
+                    disabled={subscriptionMetrics.planName === "ENTERPRISE MAX"}
                     onClick={() => handleCreateOrderAndUpgrade('premium', 999)}
                     className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/10 disabled:text-emerald-400/50 disabled:border-emerald-500/10 text-slate-950 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
                   >
-                    {subscriptionMetrics.planName === "Enterprise Premium" ? "Active" : "Upgrade"}
+                    {subscriptionMetrics.planName === "ENTERPRISE MAX" ? "Active" : "Upgrade"}
                   </button>
                 </div>
               </div>
@@ -1513,7 +1513,7 @@ export default function LaunchHubView({ sessionId }: LaunchHubViewProps) {
             </div>
 
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Multiply your customer acquisition rate dynamically! Send your unique custom referral link to 3 peers to unlock the **Pro Developer Tier** completely free.
+              Multiply your customer acquisition rate dynamically! Send your unique custom referral link to 3 peers to unlock the **MAMTA PRO SAAS Tier** completely free.
             </p>
 
             <div className="bg-slate-950/80 rounded-xl p-3 border border-slate-900 flex items-center justify-between gap-2.5">

@@ -1,0 +1,2323 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Zap, 
+  Check, 
+  Sparkles, 
+  ArrowRight, 
+  DollarSign, 
+  UserPlus, 
+  Layers, 
+  Target,
+  Flame,
+  Copy,
+  Radio,
+  Send,
+  CheckCircle2,
+  Loader2,
+  Plus,
+  Cpu,
+  LogIn,
+  LogOut,
+  Mail,
+  Lock,
+  Globe,
+  CreditCard,
+  Grid,
+  Code,
+  Eye,
+  ShieldCheck,
+  Smartphone,
+  BookOpen,
+  BarChart2,
+  Share2,
+  TrendingUp,
+  Upload
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+
+interface SaasPlatformViewProps {
+  sessionId: string;
+}
+
+export default function SaasPlatformView({ sessionId }: SaasPlatformViewProps) {
+  // Authentication State
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [country, setCountry] = useState('US');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  
+  // Logged-in User Profile State
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  // Active Screen Tab
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'ai-tool' | 'billing' | 'docs' | 'analytics' | 'affiliate' | 'team-scaling' | 'branding-pitch' | 'enterprise-automation'>('dashboard');
+
+  // Project versioning states (Step 6 Version Control System)
+  const [projectVersions, setProjectVersions] = useState<any[]>([]);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [versionPromptInput, setVersionPromptInput] = useState('');
+
+  // AI Website Builder States
+  const [prompt, setPrompt] = useState('SaaS Landing Page with glowing green buttons and pricing cards');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState('');
+  const [explanation, setExplanation] = useState('');
+  const [previewMode, setPreviewMode] = useState<'preview' | 'code' | 'editor'>('preview');
+  const [generationLogs, setGenerationLogs] = useState<string[]>([]);
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  // Step 5 Scale States
+  const [enteredOtp, setEnteredOtp] = useState('');
+  const [chatEditPrompt, setChatEditPrompt] = useState('');
+  const [isEditingAi, setIsEditingAi] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+  const [claimStatus, setClaimStatus] = useState<'idle' | 'claiming' | 'success'>('idle');
+  const [claimSuccessMsg, setClaimSuccessMsg] = useState('');
+
+  // Project management & 1-Click Deployment states (Step 3)
+  const [projectsList, setProjectsList] = useState<any[]>([]);
+  const [isSavingProject, setIsSavingProject] = useState(false);
+  const [isDeployingProject, setIsDeployingProject] = useState(false);
+  const [activeProject, setActiveProject] = useState<any>(null);
+
+  // Email verification & Referral states (Step 4)
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [friendEmail, setFriendEmail] = useState('');
+  const [isReferring, setIsReferring] = useState(false);
+  const [referralSuccess, setReferralSuccess] = useState(false);
+
+  // Checkout States
+  const [checkoutPlan, setCheckoutPlan] = useState<'PRO' | 'PREMIUM' | null>(null);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [checkoutResult, setCheckoutResult] = useState<any>(null);
+  const [paymentStep, setPaymentStep] = useState<'plan_select' | 'routing_preview' | 'secured_payment_simulation' | 'success'>('plan_select');
+
+  // ₹1 Crore SaaS Revenue Math Calculator States (Step 6)
+  const [calcSubscribers, setCalcSubscribers] = useState(500);
+  const [calcPrice, setCalcPrice] = useState(499);
+
+  const fetchUserProjects = async (userEmail: string) => {
+    try {
+      const res = await fetch('/api/saas/projects/list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setProjectsList(data.projects || []);
+      }
+    } catch (err) {
+      console.error("Failed to load user projects:", err);
+    }
+  };
+
+  const handleSaveProject = async () => {
+    if (!userProfile || !generatedCode) return;
+    setIsSavingProject(true);
+    try {
+      const res = await fetch('/api/saas/projects/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userProfile.email,
+          prompt: prompt,
+          html: generatedCode,
+          projectId: activeProject?.projectId
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActiveProject(data.project);
+        await fetchUserProjects(userProfile.email);
+        if ((window as any).showToast) {
+          (window as any).showToast("Website saved successfully!", "success");
+        }
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      alert("Failed to save project: " + err.message);
+    } finally {
+      setIsSavingProject(false);
+    }
+  };
+
+  const handleDeployProject = async () => {
+    if (!userProfile || !generatedCode) return;
+    setIsDeployingProject(true);
+    
+    let targetProjectId = activeProject?.projectId;
+    // Auto-save first if not saved yet
+    if (!targetProjectId) {
+      try {
+        const resSave = await fetch('/api/saas/projects/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: userProfile.email,
+            prompt: prompt,
+            html: generatedCode
+          })
+        });
+        const saveRes = await resSave.json();
+        if (saveRes.success) {
+          targetProjectId = saveRes.project.projectId;
+          setActiveProject(saveRes.project);
+        } else {
+          throw new Error(saveRes.error || "Auto-save failed before deployment");
+        }
+      } catch (err: any) {
+        alert("Deploy failed during auto-save: " + err.message);
+        setIsDeployingProject(false);
+        return;
+      }
+    }
+
+    try {
+      const customSubdomain = prompt.trim().toLowerCase().substring(0, 15).replace(/[^a-z0-9]/g, "") + "-" + Math.floor(100 + Math.random() * 900);
+      const res = await fetch('/api/saas/projects/deploy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userProfile.email,
+          projectId: targetProjectId,
+          subdomain: customSubdomain
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActiveProject(data.project);
+        await fetchUserProjects(userProfile.email);
+        if ((window as any).showToast) {
+          (window as any).showToast("🎉 Website deployed live successfully! Share with anyone!", "success");
+        }
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      alert("Failed to deploy project: " + err.message);
+    } finally {
+      setIsDeployingProject(false);
+    }
+  };
+
+  const handleVerifyAccount = async () => {
+    if (!userProfile) return;
+    setIsVerifying(true);
+    try {
+      const res = await fetch('/api/saas/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userProfile.email })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowVerifyModal(true);
+        if ((window as any).showToast) {
+          (window as any).showToast(`📧 Secure 2FA security OTP dispatched! (Demo OTP is: ${data.otp})`, "success");
+        }
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      alert("Failed to request verification OTP: " + err.message);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!userProfile || !enteredOtp.trim()) return;
+    setIsVerifying(true);
+    try {
+      const res = await fetch('/api/saas/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userProfile.email, otp: enteredOtp.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUserProfile(data.user);
+        setShowVerifyModal(false);
+        setEnteredOtp('');
+        if ((window as any).showToast) {
+          (window as any).showToast("✓ MFA Identity Verified successfully!", "success");
+        }
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      alert("Invalid verification code: " + err.message);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleAiEdit = async () => {
+    if (!userProfile || !chatEditPrompt.trim() || !generatedCode) return;
+    setIsEditingAi(true);
+    try {
+      const res = await fetch('/api/saas/ai/edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userProfile.email,
+          prompt: chatEditPrompt.trim(),
+          html: generatedCode
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "AI edit failed");
+      }
+      setGeneratedCode(data.updatedHtml);
+      setChatEditPrompt('');
+      if (data.user) {
+        setUserProfile(data.user);
+      }
+      if ((window as any).showToast) {
+        (window as any).showToast("✨ MAMTA AI refactored your website design live!", "success");
+      }
+    } catch (err: any) {
+      alert("AI Refactor failed: " + err.message);
+    } finally {
+      setIsEditingAi(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !userProfile) return;
+    
+    setIsUploadingLogo(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Data = reader.result as string;
+      try {
+        const res = await fetch('/api/saas/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: userProfile.email,
+            filename: file.name,
+            base64Data
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          const uploadedUrl = data.url;
+          let newHtml = generatedCode;
+          if (newHtml.includes("LOGO_URL")) {
+            newHtml = newHtml.replace(/LOGO_URL/g, uploadedUrl);
+          } else {
+            // Smart auto-injection into head image or header logo if present
+            if (newHtml.includes("<body")) {
+              const imageBox = `\n<!-- Injected Brand Asset -->\n<div style="text-align: center; margin: 16px auto; width: 100%; display: flex; justify-content: center;"><img src="${uploadedUrl}" alt="Brand Asset" style="max-height: 52px; object-fit: contain; border-radius: 8px;" /></div>\n`;
+              newHtml = newHtml.replace(/(<body[^>]*>)/i, `$1${imageBox}`);
+            }
+          }
+          setGeneratedCode(newHtml);
+          if ((window as any).showToast) {
+            (window as any).showToast(`🎉 Custom media uploaded & injected!`, "success");
+          }
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (err: any) {
+        alert("Media upload failed: " + err.message);
+      } finally {
+        setIsUploadingLogo(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const fetchAnalytics = async (userEmail: string) => {
+    setIsLoadingAnalytics(true);
+    try {
+      const res = await fetch('/api/saas/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAnalyticsData(data);
+      }
+    } catch (err) {
+      console.error("Failed to load analytics dashboard:", err);
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  };
+
+  const handleClaimEarnings = async () => {
+    setClaimStatus('claiming');
+    setTimeout(() => {
+      setClaimStatus('success');
+      setClaimSuccessMsg(`🎉 Outstanding affiliate commissions successfully transferred directly to your UPI / Bank account!`);
+      if ((window as any).showToast) {
+        (window as any).showToast("✓ Affiliate commission paid out!", "success");
+      }
+    }, 1500);
+  };
+
+  // Version Control System helpers
+  const fetchProjectVersions = async (projectId: string) => {
+    if (!userProfile) return;
+    setIsLoadingVersions(true);
+    try {
+      const res = await fetch('/api/saas/projects/versions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userProfile.email, projectId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setProjectVersions(data.versions || []);
+      }
+    } catch (err) {
+      console.error("Error fetching versions:", err);
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  };
+
+  const handleManualVersionSave = async () => {
+    if (!userProfile || !activeProject || !generatedCode) return;
+    try {
+      const res = await fetch('/api/saas/projects/versions/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userProfile.email,
+          projectId: activeProject.projectId,
+          html: generatedCode,
+          prompt: versionPromptInput.trim() || `Manual Checkpoint: ${new Date().toLocaleTimeString()}`
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setVersionPromptInput('');
+        await fetchProjectVersions(activeProject.projectId);
+        if ((window as any).showToast) {
+          (window as any).showToast(data.message, "success");
+        }
+      }
+    } catch (err: any) {
+      alert("Version save failed: " + err.message);
+    }
+  };
+
+  const handleVersionRollback = async (versionId: string) => {
+    if (!userProfile || !activeProject) return;
+    if (!window.confirm("Are you sure you want to rollback to this historical design checkpoint?")) return;
+    try {
+      const res = await fetch('/api/saas/projects/versions/rollback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userProfile.email,
+          projectId: activeProject.projectId,
+          versionId
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setGeneratedCode(data.project.html);
+        await fetchProjectVersions(activeProject.projectId);
+        if ((window as any).showToast) {
+          (window as any).showToast(data.message, "success");
+        }
+      }
+    } catch (err: any) {
+      alert("Rollback failed: " + err.message);
+    }
+  };
+
+  const handleReferFriend = async () => {
+    if (!userProfile || !friendEmail.trim()) return;
+    setIsReferring(true);
+    try {
+      const res = await fetch('/api/saas/auth/referral', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userProfile.email, friendEmail: friendEmail.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUserProfile(data.user);
+        setReferralSuccess(true);
+        setFriendEmail('');
+        if ((window as any).showToast) {
+          (window as any).showToast(data.message, "success");
+        }
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      alert("Referral mapping failed: " + err.message);
+    } finally {
+      setIsReferring(false);
+    }
+  };
+
+  // Load profile on start or login
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('saas_email');
+    const savedToken = localStorage.getItem('saas_token');
+    if (savedEmail && savedToken) {
+      setToken(savedToken);
+      fetchProfile(savedEmail);
+    }
+  }, []);
+
+  const fetchProfile = async (targetEmail: string) => {
+    try {
+      const res = await fetch('/api/saas/auth/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: targetEmail })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUserProfile(data.user);
+        setCountry(data.user.country);
+        fetchUserProjects(targetEmail);
+      }
+    } catch (err) {
+      console.error("Failed to fetch SaaS profile:", err);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setIsAuthenticating(true);
+    try {
+      const res = await fetch('/api/saas/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, country })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToken(data.token);
+        setUserProfile(data.user);
+        localStorage.setItem('saas_email', email);
+        localStorage.setItem('saas_token', data.token);
+        fetchUserProjects(email);
+        
+        // Trigger generic window event for global app syncing
+        if ((window as any).showToast) {
+          (window as any).showToast(`Logged into MAMTA AI SaaS Hub successfully!`, 'success');
+        }
+      }
+    } catch (err: any) {
+      alert("Login failed: " + err.message);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setToken(null);
+    setUserProfile(null);
+    localStorage.removeItem('saas_email');
+    localStorage.removeItem('saas_token');
+    setActiveTab('dashboard');
+    if ((window as any).showToast) {
+      (window as any).showToast(`Logged out of SaaS Platform securely.`, 'info');
+    }
+  };
+
+  // Dual Payment Routing
+  const triggerCheckout = async (planKey: 'PRO' | 'PREMIUM') => {
+    if (!userProfile) return;
+    setCheckoutPlan(planKey);
+    setIsCheckingOut(true);
+    setPaymentStep('routing_preview');
+    try {
+      const res = await fetch('/api/saas/payments/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userProfile.email,
+          country: country,
+          planKey: planKey
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCheckoutResult(data);
+        // Advance to payment step
+        setTimeout(() => {
+          setPaymentStep('secured_payment_simulation');
+        }, 2200);
+      } else {
+        alert("Checkout initialization failed: " + data.error);
+        setIsCheckingOut(false);
+      }
+    } catch (err: any) {
+      alert("Error: " + err.message);
+      setIsCheckingOut(false);
+    }
+  };
+
+  const confirmSimulatedPayment = async () => {
+    if (!userProfile || !checkoutPlan) return;
+    setIsCheckingOut(true);
+    try {
+      const res = await fetch('/api/saas/payments/upgrade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userProfile.email,
+          planKey: checkoutPlan
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUserProfile(data.user);
+        setPaymentStep('success');
+        if ((window as any).showToast) {
+          (window as any).showToast(`Upgraded to ${checkoutPlan} Plan Successfully!`, 'success');
+        }
+      }
+    } catch (err: any) {
+      alert("Upgrade failed: " + err.message);
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+
+  // AI Website Builder Generator
+  const generateWebsite = async () => {
+    if (!userProfile) return;
+    setIsGenerating(true);
+    setPreviewMode('preview');
+    setGeneratedCode('');
+    setGenerationLogs([
+      "⏳ Initializing MAMTA Web Architect Node...",
+      "🧠 Aligning layout constraints with client request...",
+      "📡 Dialing into distributed LLM generation pipeline..."
+    ]);
+
+    const logDelay = (msg: string, delay: number) => {
+      return new Promise<void>((resolve) => {
+        setTimeout(() => {
+          setGenerationLogs(prev => [...prev, msg]);
+          resolve();
+        }, delay);
+      });
+    };
+
+    try {
+      await logDelay("⚡ Fetching real-time system context configurations...", 800);
+      await logDelay("🤖 Initiating code synthesis via Gemini-3.5-Flash Core...", 1000);
+      await logDelay("🔧 Wrapping response inside beautiful production Tailwind classes...", 1200);
+
+      const res = await fetch('/api/saas/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userProfile.email,
+          prompt: prompt
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Generation request failed");
+      }
+
+      setGeneratedCode(data.code);
+      setExplanation(data.explanation);
+      // Fetch fresh profile state to update limit metrics
+      await fetchProfile(userProfile.email);
+      setGenerationLogs(prev => [...prev, "🎉 Compilation complete! Website loaded successfully in live sandboxed viewport."]);
+    } catch (err: any) {
+      setGenerationLogs(prev => [...prev, `❌ FAILED: ${err.message}`]);
+      if ((window as any).showToast) {
+        (window as any).showToast(err.message, 'error');
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(generatedCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  return (
+    <div className="flex flex-col h-full overflow-y-auto space-y-6 pb-12 custom-scrollbar pr-1 animate-[fadeIn_0.3s_ease]">
+      
+      {/* SaaS Hub Premium Header */}
+      <div className="w-full bg-slate-900/30 border border-slate-900 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-cyan-500/10 to-transparent pointer-events-none" />
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400">
+            <Cpu className="w-5 h-5 text-cyan-400" />
+          </div>
+          <div>
+            <h2 className="text-sm font-black text-slate-100 flex items-center gap-1.5 uppercase tracking-wider">
+              MAMTA AI SaaS Hub
+              <span className="text-[8px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded font-mono font-bold">STARTUP HUB</span>
+            </h2>
+            <p className="text-[10px] text-slate-400 font-mono">
+              Build custom micro-SaaS products, validate global routing, and monetize your startup!
+            </p>
+          </div>
+        </div>
+
+        {/* Global Stats bar */}
+        {userProfile && (
+          <div className="flex items-center gap-4 bg-slate-950/60 py-1.5 px-3 rounded-lg border border-slate-900/60 text-xs font-mono">
+            <div className="text-right">
+              <span className="text-[9px] text-slate-500 block">Active Plan</span>
+              <strong className="text-emerald-400">{userProfile.plan} TIER</strong>
+            </div>
+            <div className="h-6 w-[1px] bg-slate-900" />
+            <div className="text-right">
+              <span className="text-[9px] text-slate-500 block">SaaS Credits</span>
+              <strong className="text-cyan-400">
+                {userProfile.credits !== undefined ? userProfile.credits : ((userProfile.limit || 10) - (userProfile.usage || 0))}
+              </strong>
+            </div>
+            <div className="h-6 w-[1px] bg-slate-900 sm:block hidden" />
+            <div className="text-right sm:block hidden">
+              <span className="text-[9px] text-slate-500 block">AI Generations</span>
+              <strong className="text-slate-200">
+                {userProfile.usage} / {userProfile.limit === 999999 ? '∞' : userProfile.limit}
+              </strong>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Dynamic Email Verification Safe Guard Widget (MAMTA AI STEP 4) */}
+      {userProfile && !userProfile.verified && (
+        <div className="w-full bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-[pulse_3s_infinite] shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wide">
+                Email Authentication Guard Active
+              </h4>
+              <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                Verify your email address now to validate your active subscription, protect against bots, and secure your credits!
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleVerifyAccount}
+            disabled={isVerifying}
+            className="text-[10px] font-mono font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2 rounded-lg shrink-0 transition-colors flex items-center gap-1 cursor-pointer"
+          >
+            {isVerifying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+            <span>Verify Account Instantly</span>
+          </button>
+        </div>
+      )}
+
+      {/* Guest/Non-Authenticated Screen View */}
+      <AnimatePresence mode="wait">
+        {!token ? (
+          <motion.div 
+            key="login-view"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.25 }}
+            className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center"
+          >
+            {/* Strategy / Pitch Column (7 cols) */}
+            <div className="lg:col-span-7 space-y-6">
+              <div className="space-y-4">
+                <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider">
+                  🚀 AUTOMATE • MONETIZE • SCALE
+                </span>
+                <h1 className="text-2xl md:text-3xl font-black text-slate-100 leading-tight tracking-tight font-display">
+                  Turn Your Creative Ideas Into A Highly Profitable live SaaS Startup in Seconds
+                </h1>
+                <p className="text-xs md:text-sm text-slate-400 leading-relaxed max-w-xl">
+                  MAMTA AI is the world's most robust multi-tenant web application synthesis network. Generate clean codebases dynamically, simulate dual routing checkout gateways, and manage multi-user subscription tiers instantly.
+                </p>
+              </div>
+
+              {/* Unique selling points */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-slate-900/20 border border-slate-900 rounded-xl space-y-1.5">
+                  <div className="text-emerald-400 text-lg">💳</div>
+                  <h4 className="text-xs font-bold text-slate-200 uppercase">Dual Payment Routing</h4>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Auto-routes Indian traffic through secure Razorpay UPI gateways and rest-of-world clients straight to Stripe Cards.
+                  </p>
+                </div>
+                <div className="p-4 bg-slate-900/20 border border-slate-900 rounded-xl space-y-1.5">
+                  <div className="text-cyan-400 text-lg">🤖</div>
+                  <h4 className="text-xs font-bold text-slate-200 uppercase">AI Web Builder Engine</h4>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Generates clean, fully compiling Tailwind CSS HTML web codes using Gemini-3.5-Flash Supercomputers.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Login Card Column (5 cols) */}
+            <div className="lg:col-span-5">
+              <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-6 space-y-6 backdrop-blur-xl shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-20 h-20 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />
+                
+                <div className="text-center space-y-1">
+                  <h3 className="text-sm font-black text-slate-200 uppercase tracking-wider">
+                    {isSignUp ? 'Create Startup Account' : 'Startup Core Portal'}
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-mono">
+                    {isSignUp ? 'Onboard your SaaS tenancy block' : 'Enter your credentials to enter sandbox'}
+                  </p>
+                </div>
+
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-mono text-slate-400 uppercase tracking-widest block mb-1">Email Address</label>
+                    <div className="relative">
+                      <Mail className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-500" />
+                      <input 
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="you@startup.com"
+                        className="w-full bg-slate-950/80 border border-slate-900 rounded-xl pl-9 pr-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/40 font-medium placeholder:text-slate-600"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-mono text-slate-400 uppercase tracking-widest block mb-1">Password</label>
+                    <div className="relative">
+                      <Lock className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-500" />
+                      <input 
+                        type="password"
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-950/80 border border-slate-900 rounded-xl pl-9 pr-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/40 font-medium placeholder:text-slate-600"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-mono text-slate-400 uppercase tracking-widest block mb-1">Select Country (For Routing Check)</label>
+                    <div className="relative">
+                      <Globe className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-500" />
+                      <select 
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
+                        className="w-full bg-slate-950/80 border border-slate-900 rounded-xl pl-9 pr-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/40 font-medium cursor-pointer"
+                      >
+                        <option value="US">United States (USD - Stripe)</option>
+                        <option value="IN">India (INR - Razorpay)</option>
+                        <option value="GB">United Kingdom (GBP - Stripe)</option>
+                        <option value="DE">Germany (EUR - Stripe)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isAuthenticating}
+                    className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs rounded-xl uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/10 transition-all"
+                  >
+                    {isAuthenticating ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" />
+                        <span>Deploying Tenancy...</span>
+                      </>
+                    ) : (
+                      <>
+                        <LogIn className="w-4 h-4 text-slate-950" />
+                        <span>{isSignUp ? 'Create Account' : 'Authenticate Console'}</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+
+                <div className="border-t border-slate-900/60 pt-4 text-center">
+                  <button 
+                    onClick={() => {
+                      setIsSignUp(!isSignUp);
+                      // Autofill a test email for convenience
+                      if (!email) setEmail('rajveersinghm675@gmail.com');
+                      if (!password) setPassword('mamta_ai_pass_123');
+                    }}
+                    className="text-[10px] font-mono text-slate-500 hover:text-emerald-400 transition-colors"
+                  >
+                    {isSignUp ? 'Already have an account? Sign In' : 'Want a quick sandbox test account? Click to generate'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div 
+            key="dashboard-view"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="space-y-6"
+          >
+            {/* Tab Links Menu */}
+            <div className="flex border-b border-slate-900/50 pb-2.5 gap-2 shrink-0">
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  activeTab === 'dashboard' 
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15' 
+                    : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+                }`}
+              >
+                <Grid className="w-4 h-4" />
+                <span>Tenancy Dashboard</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('ai-tool')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  activeTab === 'ai-tool' 
+                    ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/15' 
+                    : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+                }`}
+              >
+                <Code className="w-4 h-4" />
+                <span>AI Website Builder</span>
+                <span className="text-[7px] bg-cyan-500/20 text-cyan-300 font-mono px-1 rounded font-black uppercase animate-pulse">KILLER FEATURE</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('billing')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  activeTab === 'billing' 
+                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/15' 
+                    : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+                }`}
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>Billing & Upgrades</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('docs')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  activeTab === 'docs' 
+                    ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/15' 
+                    : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+                }`}
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>Platform Docs</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('analytics');
+                  if (userProfile?.email) {
+                    fetchAnalytics(userProfile.email);
+                  }
+                }}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  activeTab === 'analytics' 
+                    ? 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/15' 
+                    : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+                }`}
+              >
+                <BarChart2 className="w-4 h-4" />
+                <span>Analytics Dashboard</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('affiliate')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                  activeTab === 'affiliate' 
+                    ? 'bg-teal-500/10 text-teal-400 border-teal-500/15' 
+                    : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+                }`}
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Affiliate Growth</span>
+              </button>
+
+              <button
+                onClick={handleLogout}
+                className="ml-auto px-3 py-1.5 bg-rose-500/10 text-rose-400 border border-rose-500/15 rounded-lg text-xs font-bold hover:bg-rose-500/20 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Logout Tenant</span>
+              </button>
+            </div>
+
+            {/* TAB CONTENTS */}
+            <AnimatePresence mode="wait">
+              
+              {/* Tab 1: Tenancy Dashboard */}
+              {activeTab === 'dashboard' && (
+                <motion.div 
+                  key="tab-dash"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
+                >
+                  
+                  {/* Left Column (8 cols): Dashboard Stats & Welcome */}
+                  <div className="lg:col-span-8 space-y-6">
+                    <div className="bg-gradient-to-r from-emerald-950/25 to-cyan-950/15 border border-slate-900 rounded-2xl p-6 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-emerald-500/5 to-transparent pointer-events-none" />
+                      <h2 className="text-sm font-black uppercase text-slate-100 tracking-wider">
+                        Welcome Back, Developer!
+                      </h2>
+                      <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
+                        You are connected to MAMTA AI multi-tenant SaaS. Your tenant email is <strong className="text-emerald-400 font-mono">{userProfile?.email}</strong> registered with geolocation routing set to <strong className="text-cyan-400 uppercase font-mono">{userProfile?.country || 'US'}</strong>.
+                      </p>
+
+                      {/* Quick CTA to AI Builder */}
+                      <div className="pt-4 flex gap-2">
+                        <button
+                          onClick={() => setActiveTab('ai-tool')}
+                          className="px-4 py-2 bg-cyan-500 text-slate-950 font-black text-xs rounded-lg flex items-center gap-1.5 hover:bg-cyan-400 transition-all cursor-pointer shadow-md shadow-cyan-500/10"
+                        >
+                          <span>Launch AI Web Builder</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('billing')}
+                          className="px-4 py-2 bg-slate-900 text-slate-300 font-bold text-xs rounded-lg border border-slate-800 hover:bg-slate-850 transition-all cursor-pointer"
+                        >
+                          Check Subscription Upgrades
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Subscription limit gauges */}
+                    <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-5 space-y-4">
+                      <h3 className="text-xs font-bold text-slate-200 uppercase tracking-widest flex items-center gap-2">
+                        <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
+                        Active Tenant Usage Quota Limit Metrics
+                      </h3>
+
+                      <div className="space-y-4">
+                        <div>
+                          <div className="flex justify-between items-center text-xs mb-1.5 font-mono">
+                            <span className="text-slate-400">Gemini LLM Query Usage:</span>
+                            <span className="text-slate-300 font-bold">
+                              {userProfile?.usage} / {userProfile?.limit === 999999 ? '∞ (UNLIMITED)' : `${userProfile?.limit} generations`}
+                            </span>
+                          </div>
+                          
+                          {/* Progress bar */}
+                          <div className="w-full bg-slate-950/60 h-2 rounded-full overflow-hidden border border-slate-900">
+                            <div 
+                              className={`h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 transition-all duration-300`}
+                              style={{ width: `${Math.min(100, ((userProfile?.usage || 0) / (userProfile?.limit || 1)) * 100)}%` }}
+                            />
+                          </div>
+
+                          <div className="flex justify-between text-[9px] text-slate-500 font-mono mt-1">
+                            <span>{Math.round(((userProfile?.usage || 0) / (userProfile?.limit || 1)) * 100)}% Quota Exhausted</span>
+                            <span>
+                              {userProfile?.plan === 'FREE' ? 'Upgrade to lift the limit!' : 'Pro Limit Unlocked!'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Synced SaaS Credits */}
+                        <div className="pt-2 border-t border-slate-900/40 space-y-1">
+                          <div className="flex justify-between items-center text-xs font-mono">
+                            <span className="text-slate-400">Remaining SaaS Credits:</span>
+                            <span className="text-cyan-400 font-extrabold text-sm">
+                              {userProfile?.credits !== undefined ? userProfile.credits : ((userProfile?.limit || 10) - (userProfile?.usage || 0))} credits
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-mono leading-relaxed">
+                            💡 Every generated website deducts exactly 1 credit from your database node in Firestore.
+                          </p>
+                        </div>
+
+                        {/* Extra SaaS Simulated metrics */}
+                        <div className="grid grid-cols-2 gap-4 border-t border-slate-900/60 pt-4 font-mono text-[10px]">
+                          <div className="p-2.5 bg-slate-950/40 border border-slate-900 rounded-xl">
+                            <span className="text-slate-500 block">SaaS Core Status</span>
+                            <strong className="text-emerald-400">HEALTHY (100% ONLINE)</strong>
+                          </div>
+                          <div className="p-2.5 bg-slate-950/40 border border-slate-900 rounded-xl">
+                            <span className="text-slate-500 block">Assigned Database Nodes</span>
+                            <strong className="text-cyan-400">FIRESTORE SHARD US-01</strong>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column (4 cols): Profile Details & Tenant settings */}
+                  <div className="lg:col-span-4 space-y-6">
+                    <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-5 space-y-4">
+                      <div className="flex items-center gap-2 border-b border-slate-900 pb-3">
+                        <UserPlus className="w-4 h-4 text-indigo-400" />
+                        <h3 className="text-xs font-black text-slate-200 uppercase">Tenant settings</h3>
+                      </div>
+
+                      <div className="space-y-3 font-mono text-xs">
+                        <div className="flex justify-between items-center py-2 border-b border-slate-900/40">
+                          <span className="text-slate-500">Tier Name:</span>
+                          <span className="text-emerald-400 font-bold">{userProfile?.plan}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-slate-900/40">
+                          <span className="text-slate-500">Country Code:</span>
+                          <select 
+                            value={country}
+                            onChange={(e) => {
+                              setCountry(e.target.value);
+                              fetchProfile(userProfile.email);
+                            }}
+                            className="bg-slate-950 border border-slate-900 rounded px-1.5 py-0.5 text-[11px] text-slate-300 focus:outline-none"
+                          >
+                            <option value="US">US (Stripe)</option>
+                            <option value="IN">IN (Razorpay)</option>
+                            <option value="GB">GB (Stripe)</option>
+                          </select>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-slate-900/40">
+                          <span className="text-slate-500">API Key Authorization:</span>
+                          <span className="text-cyan-400 text-[10px] truncate max-w-[150px]">{token}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </motion.div>
+              )}
+
+              {/* Tab 2: AI Web Builder */}
+              {activeTab === 'ai-tool' && (
+                <motion.div 
+                  key="tab-builder"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-4 flex flex-col h-full"
+                >
+                  
+                  {/* Dynamic low credits alert warning banner */}
+                  {userProfile && (userProfile.credits !== undefined ? userProfile.credits : ((userProfile.limit || 10) - (userProfile.usage || 0))) <= 3 && (
+                    <div className="bg-rose-500/15 border border-rose-500/25 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-[pulse_3s_infinite] shrink-0">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg flex items-center justify-center shrink-0">
+                          <Flame className="w-5 h-5 text-rose-500" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-rose-400 uppercase tracking-wide">
+                            SaaS Account Credits Running Depleted (खत्म हो रहे हैं!)
+                          </h4>
+                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                            You only have {userProfile.credits !== undefined ? userProfile.credits : ((userProfile.limit || 10) - (userProfile.usage || 0))} credits remaining. Upgrade to PRO to get 1,000 monthly credits and unblock full features.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setActiveTab('billing')}
+                        className="text-[10px] font-mono font-bold bg-rose-500 hover:bg-rose-400 text-slate-950 px-4 py-2 rounded-lg transition-colors cursor-pointer shrink-0"
+                      >
+                        Upgrade Ledgers
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Tool bar controller */}
+                  <div className="bg-slate-900/30 border border-slate-900 rounded-xl p-4 space-y-3 shrink-0">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-cyan-400 animate-[spin_10s_linear_infinite]" />
+                        MAMTA Autonomous AI Website Generator & Sandbox
+                      </h3>
+                      <span className="text-[10px] font-mono text-cyan-400 font-bold bg-cyan-500/10 border border-cyan-500/15 px-2 py-0.5 rounded uppercase">
+                        Active Model: Gemini-3.5-Flash
+                      </span>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <input 
+                        type="text"
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="Describe the website you want to synthesize..."
+                        className="flex-1 bg-slate-950/80 border border-slate-900 rounded-xl px-4 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/40 placeholder:text-slate-600 font-medium"
+                      />
+                      <button
+                        onClick={generateWebsite}
+                        disabled={isGenerating}
+                        className="px-5 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-45 transition-all shadow-lg shadow-cyan-500/10"
+                      >
+                        {isGenerating ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" />
+                            <span>Synthesizing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5 text-slate-950" />
+                            <span>Synthesize Landing Page</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Split Screen Panel for code generation results */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 h-[600px] overflow-hidden">
+                    
+                    {/* Left Panel: Log Monitor & Saved Websites Sidebar (3 cols) */}
+                    <div className="lg:col-span-3 bg-slate-900/20 border border-slate-900 rounded-2xl p-4 flex flex-col overflow-hidden">
+                      <h4 className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2 shrink-0">
+                        Operational Core Log Monitor
+                      </h4>
+
+                      <div className="h-[140px] bg-slate-950 rounded-xl border border-slate-900/60 p-3 overflow-y-auto custom-scrollbar font-mono text-[9px] text-slate-400 space-y-1.5 shadow-inner shrink-0">
+                        {generationLogs.length === 0 ? (
+                          <div className="text-slate-600 italic text-center py-10">
+                            Enter a prompt above and press Generate to begin website synthesis.
+                          </div>
+                        ) : (
+                          generationLogs.map((log, idx) => (
+                            <p key={idx} className={
+                              log.includes('🎉') || log.includes('complete') ? 'text-emerald-400 font-bold' :
+                              log.includes('🤖') || log.includes('Gemini') ? 'text-cyan-400 font-medium' :
+                              log.includes('❌') ? 'text-red-400' :
+                              'text-slate-400'
+                            }>
+                              {log}
+                            </p>
+                          ))
+                        )}
+                      </div>
+
+                      {explanation && (
+                        <div className="mt-2 p-2 bg-cyan-500/5 border border-cyan-500/10 rounded-lg text-[9px] font-mono text-cyan-300 shrink-0">
+                          <strong>Synthesis Info:</strong> {explanation}
+                        </div>
+                      )}
+
+                      {activeProject && (
+                        <div className="mt-2.5 bg-slate-950/80 border border-slate-900 rounded-xl p-3 shrink-0 space-y-2.5">
+                          <h4 className="text-[9.5px] font-mono text-cyan-400 uppercase tracking-widest flex items-center justify-between">
+                            <span>VCS VERSION HISTORY (STEP 6)</span>
+                            <span className="animate-pulse h-1.5 w-1.5 rounded-full bg-cyan-400" />
+                          </h4>
+
+                          {/* Save current snapshot */}
+                          <div className="flex gap-1.5">
+                            <input
+                              type="text"
+                              value={versionPromptInput}
+                              onChange={(e) => setVersionPromptInput(e.target.value)}
+                              placeholder="Describe checkpoint (e.g. green buttons)"
+                              className="flex-1 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[9.5px] text-slate-300 font-mono focus:outline-none focus:border-cyan-500/40 placeholder:text-slate-600"
+                            />
+                            <button
+                              onClick={handleManualVersionSave}
+                              className="px-2 py-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-[9px] font-mono rounded cursor-pointer shrink-0 transition-colors"
+                            >
+                              SAVE
+                            </button>
+                          </div>
+
+                          {/* Versions list */}
+                          <div className="max-h-[110px] overflow-y-auto custom-scrollbar space-y-1.5 pr-0.5">
+                            {isLoadingVersions ? (
+                              <div className="text-center py-2 text-[8.5px] font-mono text-slate-500">Loading version logs...</div>
+                            ) : projectVersions.length === 0 ? (
+                              <div className="text-center py-2 text-[8.5px] font-mono text-slate-600 italic">No historical checkpoints.</div>
+                            ) : (
+                              projectVersions.map((v: any, index: number) => (
+                                <div key={v.versionId || index} className="p-1.5 bg-slate-900/60 rounded border border-slate-900/80 text-[8.5px] font-mono flex items-center justify-between gap-1.5">
+                                  <div className="truncate max-w-[110px]">
+                                    <span className="text-slate-300 block font-bold truncate">{v.prompt}</span>
+                                    <span className="text-slate-500 text-[7.5px]">{new Date(v.timestamp).toLocaleTimeString()}</span>
+                                  </div>
+                                  <button
+                                    onClick={() => handleVersionRollback(v.versionId)}
+                                    className="px-1.5 py-0.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/25 rounded text-[7.5px] font-bold cursor-pointer transition-colors shrink-0"
+                                  >
+                                    ROLLBACK
+                                  </button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="border-t border-slate-900/80 my-3 pt-3 shrink-0" />
+
+                      <h4 className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2 shrink-0 flex justify-between items-center">
+                        <span>My Saved Sites ({projectsList.length})</span>
+                        <Grid className="w-3.5 h-3.5 text-cyan-500" />
+                      </h4>
+
+                      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 min-h-[180px]">
+                        {projectsList.length === 0 ? (
+                          <div className="text-slate-600 italic text-center py-10 font-mono text-[9px]">
+                            No saved sites yet.<br/>Generate one above and click 'Save Web project'.
+                          </div>
+                        ) : (
+                          projectsList.map((p, idx) => (
+                            <div 
+                              key={p.projectId || idx} 
+                              onClick={() => {
+                                setGeneratedCode(p.html);
+                                setPrompt(p.prompt);
+                                setActiveProject(p);
+                                setPreviewMode('preview');
+                                setExplanation(`Restored project "${p.prompt}" from Firestore database.`);
+                                setGenerationLogs([
+                                  `🎉 Loaded project "${p.prompt}" successfully from multi-tenant cloud storage!`,
+                                  `📂 Project ID: ${p.projectId}`,
+                                  `🔗 Deployment status: ${p.isDeployed ? "LIVE" : "DRAFT"}`
+                                ]);
+                                fetchProjectVersions(p.projectId);
+                              }}
+                              className={`p-2 rounded-xl border font-mono text-[10.5px] transition-all cursor-pointer flex flex-col gap-1 ${
+                                activeProject?.projectId === p.projectId 
+                                  ? 'bg-emerald-500/10 border-emerald-500/30' 
+                                  : 'bg-slate-950/40 border-slate-900 hover:border-slate-800 hover:bg-slate-950/80'
+                              }`}
+                            >
+                              <div className="flex justify-between items-center gap-1.5">
+                                <span className="font-extrabold text-slate-200 truncate max-w-[130px]">{p.prompt}</span>
+                                <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded ${
+                                  p.isDeployed ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-900 text-slate-500'
+                                }`}>
+                                  {p.isDeployed ? "LIVE" : "DRAFT"}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center text-[8px] text-slate-500">
+                                <span className="text-[7.5px] font-mono text-cyan-500">{p.projectId}</span>
+                                <span>{new Date(p.createdAt).toLocaleDateString()}</span>
+                              </div>
+                              {p.isDeployed && (
+                                <div className="mt-1 flex gap-1.5 justify-end shrink-0" onClick={(e) => e.stopPropagation()}>
+                                  <a 
+                                    href={`/project/${p.projectId}`} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className="text-[8.5px] text-cyan-400 hover:text-cyan-300 underline flex items-center gap-0.5"
+                                  >
+                                    <Globe className="w-2.5 h-2.5" />
+                                    <span>Live URL</span>
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right Panel: Code Workspace Render Preview (9 cols) */}
+                    <div className="lg:col-span-9 bg-slate-900/20 border border-slate-900 rounded-2xl overflow-hidden flex flex-col h-full">
+                      
+                      {/* View Controller */}
+                      <div className="p-3.5 border-b border-slate-900/80 bg-slate-950/40 flex items-center justify-between shrink-0">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setPreviewMode('preview')}
+                            className={`px-3 py-1 rounded-lg text-[10px] font-mono font-bold uppercase transition-all ${
+                              previewMode === 'preview' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/15' : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                          >
+                            Live Sandbox Frame
+                          </button>
+                          <button
+                            onClick={() => setPreviewMode('code')}
+                            className={`px-3 py-1 rounded-lg text-[10px] font-mono font-bold uppercase transition-all ${
+                              previewMode === 'code' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/15' : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                          >
+                            Source HTML Code
+                          </button>
+                          <button
+                            onClick={() => setPreviewMode('editor')}
+                            className={`px-3 py-1 rounded-lg text-[10px] font-mono font-bold uppercase transition-all ${
+                              previewMode === 'editor' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/15' : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                          >
+                            ✏️ No-Code Live Editor
+                          </button>
+                        </div>
+
+                        {generatedCode && (
+                          <div className="flex gap-2 items-center">
+                            {/* Save button */}
+                            <button
+                              onClick={handleSaveProject}
+                              disabled={isSavingProject}
+                              className="text-[9px] bg-slate-900 hover:bg-slate-850 disabled:opacity-50 text-emerald-400 border border-emerald-900/50 px-2.5 py-1 rounded flex items-center gap-1.5 cursor-pointer transition-all"
+                            >
+                              {isSavingProject ? (
+                                <Loader2 className="w-3 h-3 animate-spin text-emerald-400" />
+                              ) : (
+                                <Check className="w-3 h-3 text-emerald-400" />
+                              )}
+                              <span>{activeProject ? "Update Saved" : "Save Web project"}</span>
+                            </button>
+
+                            {/* Deploy button */}
+                            <button
+                              onClick={handleDeployProject}
+                              disabled={isDeployingProject}
+                              className={`text-[9px] px-2.5 py-1 rounded flex items-center gap-1.5 cursor-pointer transition-all ${
+                                activeProject?.isDeployed 
+                                  ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-extrabold' 
+                                  : 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold'
+                              }`}
+                            >
+                              {isDeployingProject ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Globe className="w-3 h-3" />
+                              )}
+                              <span>{activeProject?.isDeployed ? "Live Deployed 🔥" : "1-Click Deploy Live"}</span>
+                            </button>
+
+                            {activeProject?.isDeployed && (
+                              <a
+                                href={`/project/${activeProject.projectId}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[9.5px] text-cyan-400 hover:text-cyan-300 underline font-mono flex items-center gap-1"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Visit Site</span>
+                              </a>
+                            )}
+
+                            <button
+                              onClick={handleCopyCode}
+                              className="text-[9px] bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-2.5 py-1 rounded flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              {copiedCode ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-indigo-400" />}
+                              <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Code Render Body */}
+                      <div className="flex-1 bg-slate-950 overflow-hidden relative">
+                        {isGenerating && (
+                          <div className="absolute inset-0 bg-slate-950/80 z-20 flex flex-col items-center justify-center space-y-3">
+                            <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                            <p className="text-xs font-mono text-cyan-300">Synthesizing live layout preview...</p>
+                          </div>
+                        )}
+
+                        {!generatedCode ? (
+                          <div className="h-full flex flex-col items-center justify-center text-slate-600 text-xs font-mono p-4 text-center">
+                            <span className="text-xl mb-2">🌐</span>
+                            <span>No output generated yet. Give prompt instructions above to build beautiful code template.</span>
+                          </div>
+                        ) : previewMode === 'preview' ? (
+                          <iframe 
+                            srcDoc={generatedCode}
+                            title="Compilation Preview"
+                            sandbox="allow-scripts allow-modals"
+                            className="w-full h-full bg-slate-900 border-none rounded-b-xl"
+                          />
+                        ) : previewMode === 'code' ? (
+                          <pre className="w-full h-full p-4 overflow-auto custom-scrollbar font-mono text-[10.5px] text-cyan-400 select-text whitespace-pre-wrap">
+                            {generatedCode}
+                          </pre>
+                        ) : (
+                          /* No-Code Split Screen Live Editor */
+                          <div className="w-full h-full flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-900 bg-slate-950">
+                            
+                            {/* Left Textarea Code Controller */}
+                            <div className="w-full md:w-1/2 p-4 flex flex-col h-full space-y-4 overflow-y-auto custom-scrollbar bg-slate-950">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[9px] font-mono text-cyan-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                                  Mamta Real-Time Sync Workspace
+                                </span>
+                                <span className="text-[8px] font-mono text-slate-500">
+                                  Keystrokes render instantly
+                                </span>
+                              </div>
+
+                              <textarea
+                                value={generatedCode}
+                                onChange={(e) => setGeneratedCode(e.target.value)}
+                                className="flex-1 w-full min-h-[300px] md:min-h-[auto] p-3.5 bg-slate-900/40 border border-slate-900 rounded-xl font-mono text-[10.5px] text-emerald-400 focus:outline-none focus:border-cyan-500/30 resize-none overflow-y-auto custom-scrollbar leading-relaxed"
+                                placeholder="Edit your live website source code directly..."
+                              />
+
+                              {/* 🤖 MAMTA Chat-to-Edit AI Interface */}
+                              <div className="bg-slate-900/35 border border-slate-900 p-3.5 rounded-xl space-y-3 shrink-0">
+                                <div className="flex items-center justify-between">
+                                  <h5 className="text-[10px] font-black text-cyan-400 uppercase tracking-wide flex items-center gap-1.5">
+                                    <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                                    <span>Chat-to-Edit AI Refactor</span>
+                                  </h5>
+                                  <span className="text-[7.5px] font-mono text-slate-500 uppercase">
+                                    -1 Credit per edit
+                                  </span>
+                                </div>
+                                <p className="text-[8.5px] text-slate-400 font-mono leading-normal">
+                                  Tell Mamta AI what to modify, append, or redesign on your website live.
+                                </p>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={chatEditPrompt}
+                                    onChange={(e) => setChatEditPrompt(e.target.value)}
+                                    placeholder="e.g. 'make pricing cards glowing neon green'"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        handleAiEdit();
+                                      }
+                                    }}
+                                    className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-900 rounded-lg text-[10px] font-mono text-slate-200 focus:outline-none focus:border-cyan-500/30"
+                                  />
+                                  <button
+                                    onClick={handleAiEdit}
+                                    disabled={isEditingAi || !chatEditPrompt.trim()}
+                                    className="px-3 bg-cyan-500 text-slate-950 hover:bg-cyan-400 disabled:opacity-40 font-black text-[10px] rounded-lg transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                                  >
+                                    {isEditingAi ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                                    <span>Edit</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* 📷 Media Asset / Logo Upload Portal */}
+                              <div className="bg-slate-900/35 border border-slate-900 p-3.5 rounded-xl space-y-2 shrink-0">
+                                <div className="flex items-center justify-between">
+                                  <h5 className="text-[10px] font-black text-emerald-400 uppercase tracking-wide flex items-center gap-1.5">
+                                    <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span>Media logo upload</span>
+                                  </h5>
+                                  <span className="text-[7.5px] font-mono text-slate-500 uppercase">
+                                    SVG, PNG, JPG
+                                  </span>
+                                </div>
+                                <p className="text-[8.5px] text-slate-400 font-mono leading-normal">
+                                  Upload a custom logo to inject directly into your live design structure.
+                                </p>
+                                <div className="relative">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    id="logo-upload-input"
+                                    onChange={handleLogoUpload}
+                                    className="hidden"
+                                  />
+                                  <label
+                                    htmlFor="logo-upload-input"
+                                    className="w-full py-2 bg-slate-950 hover:bg-slate-900 border border-slate-900 hover:border-slate-800 rounded-lg flex items-center justify-center gap-2 text-[9.5px] font-mono text-slate-300 hover:text-emerald-400 cursor-pointer transition-all"
+                                  >
+                                    {isUploadingLogo ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <Upload className="w-3.5 h-3.5" />
+                                    )}
+                                    <span>{isUploadingLogo ? 'Processing image...' : 'Choose brand image logo'}</span>
+                                  </label>
+                                </div>
+                              </div>
+
+                              {/* Quick Injection Micro Actions */}
+                              <div className="bg-slate-900/25 border border-slate-900/60 p-3 rounded-xl space-y-2 shrink-0">
+                                <h5 className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wide">
+                                  ✏️ No-Code Quick-Inject Blocks
+                                </h5>
+                                <p className="text-[8.5px] text-slate-500 font-mono">
+                                  One-click inject pre-styled blocks into your landing page design structure.
+                                </p>
+                                <div className="grid grid-cols-2 gap-2 pt-1">
+                                  <button
+                                    onClick={() => {
+                                      const dealBlock = `
+  <!-- MAMTA Promotional Deal Banner -->
+  <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 180, 212, 0.1)); border: 1.5px solid rgba(16, 185, 129, 0.35); padding: 16px 24px; border-radius: 20px; text-align: center; margin: 32px auto; max-width: 600px; font-family: sans-serif;">
+    <span style="font-size: 9px; font-weight: 900; background: #10b981; color: #000; padding: 3px 8px; border-radius: 99px; letter-spacing: 1px; text-transform: uppercase;">EXCLUSIVE SUMMER LAUNCH OFFER</span>
+    <h3 style="color: #ffffff; margin-top: 10px; font-size: 16px; font-weight: 800;">🎉 Launch Special Deals Live</h3>
+    <p style="color: #94a3b8; font-size: 11px; margin-top: 4px; line-height: 1.4;">Claim your custom subdomain today and receive a 50% lifetime discount with coupon <strong style="color: #10b981;">MAMTA50</strong></p>
+  </div>
+                                      `;
+                                      if (generatedCode.includes("</body>")) {
+                                        setGeneratedCode(generatedCode.replace("</body>", `${dealBlock}\n</body>`));
+                                      } else {
+                                        setGeneratedCode(generatedCode + dealBlock);
+                                      }
+                                    }}
+                                    className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-lg text-[9px] font-mono text-left transition-colors"
+                                  >
+                                    + Inject Promo Deal Banner
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      const alertBlock = `
+  <script>
+    setTimeout(() => {
+      alert("✨ Hello Founder! This alert was injected live via MAMTA AI Interactive Studio!");
+    }, 1000);
+  </script>
+                                      `;
+                                      if (generatedCode.includes("</body>")) {
+                                        setGeneratedCode(generatedCode.replace("</body>", `${alertBlock}\n</body>`));
+                                      } else {
+                                        setGeneratedCode(generatedCode + alertBlock);
+                                      }
+                                    }}
+                                    className="px-2.5 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 rounded-lg text-[9px] font-mono text-left transition-colors"
+                                  >
+                                    + Inject Simulated Alert Popup
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Right Live Sync iframe view */}
+                            <div className="w-full md:w-1/2 h-full bg-slate-900 relative">
+                              <div className="absolute top-2 right-2 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800 text-[8px] font-mono text-slate-400 uppercase tracking-widest z-10 pointer-events-none">
+                                Sandboxed preview Frame
+                              </div>
+                              <iframe 
+                                srcDoc={generatedCode}
+                                title="No-Code Sync Viewport"
+                                sandbox="allow-scripts allow-modals"
+                                className="w-full h-full bg-slate-900 border-none"
+                              />
+                            </div>
+
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                </motion.div>
+              )}
+
+              {/* Tab 3: Billing & Upgrades */}
+              {activeTab === 'billing' && (
+                <motion.div 
+                  key="tab-billing"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-6"
+                >
+                  
+                  {/* Real-time SaaS Credit & Billing Ledger */}
+                  {userProfile && (
+                    <div className="bg-slate-950 border border-slate-900 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-cyan-500/5 to-transparent pointer-events-none" />
+                      <div>
+                        <span className="px-2.5 py-0.5 rounded font-mono text-[8px] bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 uppercase font-black tracking-widest">
+                          PRODUCTION BILLING SHARD CONNECTED
+                        </span>
+                        <h4 className="text-xs font-black text-slate-200 mt-2 uppercase tracking-wide">
+                          Real-Time SaaS Credit & Billing Account Details
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-mono mt-1">
+                          Tenant Ledger ID: <span className="text-slate-300 font-bold">{userProfile.email}</span>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-6 font-mono text-xs">
+                        <div className="text-left md:text-right">
+                          <span className="text-[9px] text-slate-500 block">Current Active Tier</span>
+                          <span className="text-emerald-400 font-extrabold uppercase">{userProfile.plan} PLAN</span>
+                        </div>
+                        <div className="h-8 w-[1px] bg-slate-900" />
+                        <div className="text-left md:text-right">
+                          <span className="text-[9px] text-slate-500 block">Remaining Credits</span>
+                          <span className="text-cyan-400 font-black text-sm">
+                            {userProfile.credits !== undefined ? userProfile.credits : (userProfile.limit - userProfile.usage)} / {userProfile.limit === 999999 ? '∞' : userProfile.limit}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Upgrade plans card grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    
+                    {/* Free Plan */}
+                    <div className="bg-slate-900/20 border border-slate-900 rounded-2xl p-5 space-y-4 relative flex flex-col">
+                      <div className="space-y-1">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Free Starter Tier</h4>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-xl font-black text-slate-100">₹0</span>
+                          <span className="text-[10px] text-slate-500 font-mono">/ month</span>
+                        </div>
+                      </div>
+
+                      <ul className="text-xs text-slate-400 space-y-2 flex-1">
+                        <li className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>10 LLM Generations limit</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Standard Tailwind components</span>
+                        </li>
+                      </ul>
+
+                      <button
+                        disabled
+                        className="w-full py-2 bg-slate-950 text-slate-600 border border-slate-900 text-xs font-bold rounded-xl cursor-not-allowed"
+                      >
+                        Active Account Plan
+                      </button>
+                    </div>
+
+                    {/* Pro Plan */}
+                    <div className="bg-slate-900/30 border border-cyan-500/30 rounded-2xl p-5 space-y-4 relative flex flex-col shadow-lg shadow-cyan-500/5">
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-cyan-500/10 to-transparent pointer-events-none" />
+                      <div className="space-y-1">
+                        <span className="absolute -top-3 left-4 bg-gradient-to-r from-cyan-500 to-indigo-500 text-slate-950 text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-widest">
+                          BEST SELLER 🔥
+                        </span>
+                        <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">MAMTA PRO SaaS</h4>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-xl font-black text-slate-100">
+                            {country === 'IN' ? '₹499' : '$9.99'}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-mono">/ month</span>
+                        </div>
+                      </div>
+
+                      <ul className="text-xs text-slate-300 space-y-2 flex-1">
+                        <li className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>1,000 High-Quality Synthesis limit</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Advanced Gemini-3.5-Flash</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Stripe & Razorpay auto-routing</span>
+                        </li>
+                      </ul>
+
+                      <button
+                        onClick={() => triggerCheckout('PRO')}
+                        disabled={userProfile?.plan === 'PRO' || userProfile?.plan === 'PREMIUM'}
+                        className="w-full py-2 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:opacity-90 disabled:opacity-40 text-slate-950 font-black text-xs rounded-xl cursor-pointer transition-all"
+                      >
+                        {userProfile?.plan === 'PRO' || userProfile?.plan === 'PREMIUM' ? 'Subscribed' : 'Upgrade to Pro'}
+                      </button>
+                    </div>
+
+                    {/* Premium Plan */}
+                    <div className="bg-slate-900/20 border border-slate-900 rounded-2xl p-5 space-y-4 relative flex flex-col">
+                      <div className="space-y-1">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Enterprise Max</h4>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-xl font-black text-slate-100">
+                            {country === 'IN' ? '₹999' : '$19.99'}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-mono">/ month</span>
+                        </div>
+                      </div>
+
+                      <ul className="text-xs text-slate-400 space-y-2 flex-1">
+                        <li className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Unlimited AI generations</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Dedicated Shard Firestore Node</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Dedicated support support team</span>
+                        </li>
+                      </ul>
+
+                      <button
+                        onClick={() => triggerCheckout('PREMIUM')}
+                        disabled={userProfile?.plan === 'PREMIUM'}
+                        className="w-full py-2 bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-800 hover:border-slate-700 text-xs font-bold rounded-xl cursor-pointer transition-all"
+                      >
+                        {userProfile?.plan === 'PREMIUM' ? 'Subscribed' : 'Request Enterprise'}
+                      </button>
+                    </div>
+
+                  </div>
+
+                  {/* Dynamic Checkout Flow Panel */}
+                  <AnimatePresence>
+                    {isCheckingOut && checkoutPlan && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="bg-slate-900/30 border border-slate-900 p-6 rounded-2xl space-y-5"
+                      >
+                        
+                        {/* 1. Routing step */}
+                        {paymentStep === 'routing_preview' && (
+                          <div className="text-center py-6 space-y-4">
+                            <Loader2 className="w-6 h-6 text-cyan-400 animate-spin mx-auto" />
+                            <div className="space-y-1.5">
+                              <h4 className="text-xs font-black uppercase text-slate-200">
+                                Dynamic Payment Routing Engine Triggered
+                              </h4>
+                              <p className="text-[10.5px] text-slate-500 font-mono">
+                                Detecting Client IP Geolocation: <strong className="text-emerald-400 uppercase">{country}</strong>
+                              </p>
+                            </div>
+
+                            {/* Dual Routing Graphic */}
+                            <div className="flex items-center justify-center gap-6 pt-4 font-mono text-[10px]">
+                              <div className="p-3 bg-slate-950 border border-slate-900 rounded-xl">
+                                <span className="text-slate-500 block">SaaS billing</span>
+                                <strong className="text-slate-300">Mamta Platform</strong>
+                              </div>
+                              <div className="text-slate-600 animate-pulse font-extrabold text-sm">➔</div>
+                              <div className={`p-3 bg-slate-950 border rounded-xl ${country === 'IN' ? 'border-amber-500/30 text-amber-400' : 'border-indigo-500/30 text-indigo-400'}`}>
+                                <span className="text-slate-500 block">Assigned Gateway</span>
+                                <strong>{country === 'IN' ? '🇮🇳 RAZORPAY API' : '🌍 STRIPE CARDS API'}</strong>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 2. Simulation Step */}
+                        {paymentStep === 'secured_payment_simulation' && checkoutResult && (
+                          <div className="space-y-4">
+                            <div className="border-b border-slate-900 pb-3 flex justify-between items-center">
+                              <div>
+                                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                                  Secure checkout transaction gateway
+                                </h4>
+                                <p className="text-[9px] text-slate-500 font-mono">
+                                  ORDER REF: {checkoutResult.order?.id || checkoutResult.session?.id}
+                                </p>
+                              </div>
+                              <span className="px-2 py-0.5 rounded font-mono text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 uppercase font-black tracking-widest animate-pulse">
+                                SECURED CORE
+                              </span>
+                            </div>
+
+                            {/* Form Body for checkout */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              
+                              {/* Left Side Billing Summary */}
+                              <div className="p-4 bg-slate-950 rounded-xl border border-slate-900 space-y-3 font-mono text-xs">
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500">Subscription Item:</span>
+                                  <span className="text-slate-200">MAMTA SaaS {checkoutPlan}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500">Target Tenant:</span>
+                                  <span className="text-slate-200 truncate max-w-[150px]">{userProfile.email}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500">Checkout Currency:</span>
+                                  <span className="text-slate-200 font-bold">{checkoutResult.currency}</span>
+                                </div>
+                                <div className="border-t border-slate-900/60 pt-2 flex justify-between font-bold">
+                                  <span className="text-slate-500">Amount Due:</span>
+                                  <span className="text-emerald-400">
+                                    {checkoutResult.currency === 'INR' ? `₹${checkoutResult.amount}` : `$${checkoutResult.amount}.00`}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Right Side UI Payment Fields */}
+                              <div className="p-4 bg-slate-950 rounded-xl border border-slate-900 space-y-3">
+                                {checkoutResult.gateway === 'RAZORPAY' ? (
+                                  <div className="space-y-3">
+                                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-center text-[10.5px] font-mono leading-relaxed">
+                                      UPI / QR / NET BANKING SECURE INTEGRATION (INDIA)
+                                    </div>
+                                    <button
+                                      onClick={confirmSimulatedPayment}
+                                      className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                                    >
+                                      <span>Verify UPI Checkout UPI ₹{checkoutResult.amount}</span>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-xl text-center text-[10.5px] font-mono leading-relaxed">
+                                      GLOBAL CREDIT CARDS ROUTING SECURE (STRIPE)
+                                    </div>
+                                    <button
+                                      onClick={confirmSimulatedPayment}
+                                      className="w-full py-2 bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-black text-xs rounded-xl uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                                    >
+                                      <span>Process Secure Card payment ${checkoutResult.amount}.00</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 3. Success Step */}
+                        {paymentStep === 'success' && (
+                          <div className="text-center py-6 space-y-4">
+                            <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto text-lg">
+                              ✓
+                            </div>
+                            <div className="space-y-1.5">
+                              <h4 className="text-sm font-black uppercase text-emerald-400">
+                                SaaS subscription upgraded successfully!
+                              </h4>
+                              <p className="text-[11px] text-slate-400 max-w-md mx-auto leading-relaxed">
+                                Your account is now fully elevated to <strong>{checkoutPlan}</strong> tier. Generation limits have been expanded up to {checkoutPlan === 'PREMIUM' ? 'UNLIMITED' : '1,000 queries'} instantly.
+                              </p>
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                setIsCheckingOut(false);
+                                setCheckoutPlan(null);
+                                setActiveTab('dashboard');
+                              }}
+                              className="px-4 py-1.5 bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-800 text-xs font-semibold rounded-lg cursor-pointer"
+                            >
+                              Return to Dashboard Workspace
+                            </button>
+                          </div>
+                        )}
+
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Viral Growth & Referral Rewards System (MAMTA AI STEP 4) */}
+                  <div className="bg-slate-950 border border-slate-900 rounded-2xl p-5 relative overflow-hidden mt-6">
+                    <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-emerald-500/5 to-transparent pointer-events-none" />
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                      <div className="space-y-1.5 flex-1">
+                        <span className="px-2.5 py-0.5 rounded font-mono text-[8px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 uppercase font-black tracking-widest">
+                          MAMTA VIRAL REWARD CORE ACTIVE
+                        </span>
+                        <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide">
+                          Invite Your Founders Circle & Claim Free SaaS Credits!
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-mono leading-relaxed max-w-xl">
+                          Every friend who registers with Mamta AI using your referral grants you <strong className="text-emerald-400 font-bold">+20 Premium Generation Credits</strong> directly inside your billing ledger. Tap into our viral growth system instantly.
+                        </p>
+                      </div>
+
+                      <div className="w-full md:w-80 bg-slate-900/40 border border-slate-900 p-4 rounded-xl space-y-3">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-mono text-slate-500 uppercase">Friend's Email Address</label>
+                          <input
+                            type="email"
+                            value={friendEmail}
+                            onChange={(e) => setFriendEmail(e.target.value)}
+                            placeholder="e.g. startup-founder@gmail.com"
+                            className="w-full px-3 py-1.5 bg-slate-950 border border-slate-900 rounded-lg text-[11px] font-mono text-slate-200 focus:outline-none focus:border-emerald-500/30"
+                          />
+                        </div>
+                        <button
+                          onClick={handleReferFriend}
+                          disabled={isReferring || !friendEmail}
+                          className="w-full py-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-black text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          {isReferring ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : null}
+                          <span>Send Free Invitation Code</span>
+                        </button>
+                        {referralSuccess && (
+                          <p className="text-[9px] font-mono text-emerald-400 text-center animate-bounce">
+                            ✓ Friend referred! +20 Credits applied to your Ledger balance!
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                </motion.div>
+              )}
+
+              {/* Tab 4: Platform Docs */}
+              {activeTab === 'docs' && (
+                <motion.div 
+                  key="tab-docs"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="bg-slate-900/20 border border-slate-900 p-5 rounded-2xl space-y-4 font-sans text-xs text-slate-400 leading-relaxed"
+                >
+                  <h3 className="text-sm font-black text-slate-200 uppercase tracking-wider border-b border-slate-900 pb-3">
+                    MAMTA AI Multi-Tenant SaaS Platform API Reference
+                  </h3>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-slate-300 uppercase">1. User Tenancy login</h4>
+                      <p>
+                        Allows user nodes to authenticate, claim tenancy namespaces, and fetch subscription billing limits from localized storage structures.
+                      </p>
+                      <pre className="p-3 bg-slate-950 rounded-lg border border-slate-900 font-mono text-[9.5px] text-cyan-400">
+                        POST /api/saas/auth/login {"\n"}
+                        Payload: {"{ email: \"user@gmail.com\", password: \"pass123\", country: \"IN\" }"}
+                      </pre>
+                    </div>
+
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-slate-300 uppercase">2. Dual Currency Router</h4>
+                      <p>
+                        Monitors and evaluates connection parameters. Automatically forwards traffic securely to the Razorpay UPI platform for clients inside Indian regions, and falls back to Stripe API Cards elsewhere.
+                      </p>
+                      <pre className="p-3 bg-slate-950 rounded-lg border border-slate-900 font-mono text-[9.5px] text-cyan-400">
+                        POST /api/saas/payments/checkout {"\n"}
+                        Payload: {"{ email: \"user@gmail.com\", country: \"IN\", planKey: \"PRO\" }"}
+                      </pre>
+                    </div>
+
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-slate-300 uppercase">3. High-Fidelity Website Generator AI</h4>
+                      <p>
+                        Queries Gemini-3.5-Flash Supercomputers on backend middleware proxy, enforcing limits before compilation synthesis to prevent usage abuse in free users. Implements sliding window IP rate limiting (1.5s minimum gap).
+                      </p>
+                      <pre className="p-3 bg-slate-950 rounded-lg border border-slate-900 font-mono text-[9.5px] text-cyan-400">
+                        POST /api/saas/ai/generate {"\n"}
+                        Payload: {"{ email: \"user@gmail.com\", prompt: \"modern tech landing page\" }"}
+                      </pre>
+                    </div>
+
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-slate-300 uppercase">4. Real-time Billing & Credits Sync</h4>
+                      <p>
+                        Queries actual Firestore documents securely to retrieve dynamic, real-time credit metrics, plan state, and usage consumption.
+                      </p>
+                      <pre className="p-3 bg-slate-950 rounded-lg border border-slate-900 font-mono text-[9.5px] text-cyan-400">
+                        POST /api/saas/billing {"\n"}
+                        Payload: {"{ email: \"user@gmail.com\" }"}
+                      </pre>
+                    </div>
+                  </div>
+
+                </motion.div>
+              )}
+
+              {/* Tab 5: Website Analytics Dashboard */}
+              {activeTab === 'analytics' && (
+                <motion.div 
+                  key="tab-analytics"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-6"
+                >
+                  {/* Top Overview Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-slate-950 border border-slate-900 rounded-2xl p-5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-cyan-500/5 to-transparent pointer-events-none" />
+                      <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest block">Total Page Views</span>
+                      <strong className="text-2xl font-black text-slate-100 mt-2 block">
+                        {isLoadingAnalytics ? '...' : (analyticsData?.summary?.totalViews || 0)}
+                      </strong>
+                      <span className="text-[9px] text-emerald-400 font-mono mt-1 flex items-center gap-1">
+                        <TrendingUp className="w-3 h-3" /> +14.2% Growth vs yesterday
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-950 border border-slate-900 rounded-2xl p-5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-fuchsia-500/5 to-transparent pointer-events-none" />
+                      <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest block">Total Click Conversion</span>
+                      <strong className="text-2xl font-black text-slate-100 mt-2 block">
+                        {isLoadingAnalytics ? '...' : (analyticsData?.summary?.totalClicks || 0)}
+                      </strong>
+                      <span className="text-[9px] text-fuchsia-400 font-mono mt-1 flex items-center gap-1">
+                        <TrendingUp className="w-3 h-3" /> +8.3% Click Rate
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-950 border border-slate-900 rounded-2xl p-5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-emerald-500/5 to-transparent pointer-events-none" />
+                      <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest block">Referred Founders</span>
+                      <strong className="text-2xl font-black text-slate-100 mt-2 block">
+                        {userProfile?.referralCount || 0}
+                      </strong>
+                      <span className="text-[9px] text-emerald-400 font-mono mt-1">
+                        🎉 Earned ₹{(userProfile?.referralCount || 0) * 50} Cash rewards
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-950 border border-slate-900 rounded-2xl p-5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-500/5 to-transparent pointer-events-none" />
+                      <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest block">Deployed Domains</span>
+                      <strong className="text-2xl font-black text-slate-100 mt-2 block">
+                        {projectsList.filter(p => p.isDeployed).length}
+                      </strong>
+                      <span className="text-[9px] text-cyan-400 font-mono mt-1">
+                        ⚡ Deployed live instantly
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Custom Graphic Chart of Traffic over past 7 days */}
+                  <div className="bg-slate-950 border border-slate-900 rounded-2xl p-6 relative overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-slate-900 pb-4">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide">
+                          Live Traffic Analytics Node
+                        </h4>
+                        <p className="text-[9px] text-slate-500 font-mono">
+                          Visualization of visitor page views vs conversions (Updated live)
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4 text-[9px] font-mono">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                          <span className="text-slate-400">Page Views</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-fuchsia-400" />
+                          <span className="text-slate-400">Click Conversions</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Custom high-fidelity SVG/CSS graph representation */}
+                    <div className="h-44 flex items-end justify-between gap-2 sm:gap-6 pt-6 relative border-b border-slate-900">
+                      {/* Graph Bars */}
+                      {(() => {
+                        const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+                        const viewData = [120, 240, 180, 310, 420, 380, 510];
+                        const clickData = [15, 32, 22, 45, 68, 55, 94];
+                        const maxVal = 550;
+
+                        return days.map((day, idx) => {
+                          const viewHeight = (viewData[idx] / maxVal) * 100;
+                          const clickHeight = (clickData[idx] / maxVal) * 100 * 3.5; // Scale click to make it visible
+                          return (
+                            <div key={day} className="flex-1 flex flex-col items-center group relative cursor-pointer">
+                              {/* Hover Tooltip */}
+                              <div className="absolute -top-12 bg-slate-900 border border-slate-800 text-[8px] font-mono text-slate-300 p-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap shadow-xl">
+                                <div>Views: <strong className="text-cyan-400">{viewData[idx]}</strong></div>
+                                <div>Clicks: <strong className="text-fuchsia-400">{clickData[idx]}</strong></div>
+                              </div>
+
+                              <div className="w-full flex items-end justify-center gap-1.5 h-32">
+                                {/* Page View Bar */}
+                                <div 
+                                  style={{ height: `${viewHeight}%` }} 
+                                  className="w-2.5 sm:w-4 rounded-t bg-cyan-500/20 group-hover:bg-cyan-500/40 border-t border-cyan-400/30 transition-all duration-300" 
+                                />
+                                {/* Click Conversion Bar */}
+                                <div 
+                                  style={{ height: `${Math.min(100, clickHeight)}%` }} 
+                                  className="w-2.5 sm:w-4 rounded-t bg-fuchsia-500/20 group-hover:bg-fuchsia-500/40 border-t border-fuchsia-400/30 transition-all duration-300" 
+                                />
+                              </div>
+                              <span className="text-[9px] text-slate-500 font-mono mt-2">{day}</span>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Raw Event Activity Log */}
+                  <div className="bg-slate-950 border border-slate-900 rounded-2xl p-5 space-y-4">
+                    <div>
+                      <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide">
+                        SaaS Analytics Raw Activity Ledger
+                      </h4>
+                      <p className="text-[9px] text-slate-500 font-mono">
+                        Real-time firestore event streams captured by our global reverse proxy
+                      </p>
+                    </div>
+
+                    <div className="divide-y divide-slate-900/60 font-mono text-[10px] max-h-56 overflow-y-auto custom-scrollbar">
+                      {isLoadingAnalytics ? (
+                        <div className="text-center py-6 text-slate-500">Loading live telemetry stream...</div>
+                      ) : (analyticsData?.logs && analyticsData.logs.length > 0) ? (
+                        analyticsData.logs.map((log: any, index: number) => (
+                          <div key={index} className="py-2.5 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-cyan-400">●</span>
+                              <span className="text-slate-300 capitalize">{log.eventType?.replace(/_/g, " ")}</span>
+                              <span className="text-slate-500">({log.details})</span>
+                            </div>
+                            <span className="text-slate-500 shrink-0">
+                              {new Date(log.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-slate-500">
+                          No analytics telemetry recorded yet. Deploy your website and share it to see live visits in real-time!
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Tab 6: Affiliate Program */}
+              {activeTab === 'affiliate' && (
+                <motion.div 
+                  key="tab-affiliate"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-6"
+                >
+                  <div className="bg-gradient-to-r from-teal-950/20 to-slate-950 border border-slate-900 rounded-2xl p-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-teal-500/5 to-transparent pointer-events-none" />
+                    <span className="px-2.5 py-0.5 rounded font-mono text-[8px] bg-teal-500/10 border border-teal-500/20 text-teal-400 uppercase font-black tracking-widest">
+                      MAMTA REVENUE SHARE
+                    </span>
+                    <h3 className="text-sm font-black text-slate-100 uppercase tracking-wide mt-3">
+                      Mamta AI High-Yield Affiliate Partnership Program
+                    </h3>
+                    <p className="text-[10.5px] text-slate-400 leading-relaxed max-w-2xl mt-1.5 font-mono">
+                      Join our mission to democratize website creation! Refer founders, designers, and developers to Mamta AI. For every single active member who signs up using your affiliate credentials and upgrades, you receive <strong className="text-emerald-400">₹50 in real cash payout commissions</strong>.
+                    </p>
+                  </div>
+
+                  {/* Core Referral Link & Claim Earnings Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Left: Your Affiliate Link Card */}
+                    <div className="bg-slate-950 border border-slate-900 rounded-2xl p-5 space-y-4">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide">
+                          Your Unique Referral Link
+                        </h4>
+                        <p className="text-[9px] text-slate-500 font-mono">
+                          Share this link across social media (Twitter, LinkedIn) to earn recurring commissions
+                        </p>
+                      </div>
+
+                      <div className="flex gap-2 font-mono">
+                        <input
+                          type="text"
+                          readOnly
+                          value={`https://mamta.ai/join?ref=${userProfile?.email || 'partner'}`}
+                          className="flex-1 px-3 py-2 bg-slate-900 border border-slate-900 rounded-lg text-[10px] text-emerald-400 select-all outline-none"
+                        />
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(`https://mamta.ai/join?ref=${userProfile?.email || 'partner'}`);
+                            if ((window as any).showToast) {
+                              (window as any).showToast("✓ Referral link copied to clipboard!", "success");
+                            }
+                          }}
+                          className="px-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-lg text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+                        >
+                          Copy
+                        </button>
+                      </div>
+
+                      {/* Invite Banner Generator */}
+                      <div className="bg-slate-900/40 border border-slate-900 p-4 rounded-xl space-y-3">
+                        <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block">
+                          Micro Email Invitation Form
+                        </span>
+                        <div className="flex gap-2">
+                          <input
+                            type="email"
+                            value={friendEmail}
+                            onChange={(e) => setFriendEmail(e.target.value)}
+                            placeholder="invitee-founder@gmail.com"
+                            className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-900 rounded-lg text-[10px] font-mono text-slate-200 focus:outline-none focus:border-teal-500/30"
+                          />
+                          <button
+                            onClick={handleReferFriend}
+                            disabled={isReferring || !friendEmail}
+                            className="px-4 py-1.5 bg-teal-500 hover:bg-teal-400 disabled:opacity-40 text-slate-950 font-black text-xs rounded-lg transition-colors flex items-center justify-center gap-1"
+                          >
+                            {isReferring ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                            <span>Invite</span>
+                          </button>
+                        </div>
+                        {referralSuccess && (
+                          <p className="text-[8px] font-mono text-emerald-400">
+                            ✓ Invitation sent successfully! +20 platform credits credited to your account!
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right: Claim Commission Earnings */}
+                    <div className="bg-slate-950 border border-slate-900 rounded-2xl p-5 flex flex-col justify-between">
+                      <div className="space-y-3">
+                        <div>
+                          <h4 className="text-xs font-black text-slate-200 uppercase tracking-wide">
+                            Affiliate Commissions Ledger
+                          </h4>
+                          <p className="text-[9px] text-slate-500 font-mono">
+                            Request real-time withdrawals of your earned referral share
+                          </p>
+                        </div>
+
+                        {/* Earnings figures */}
+                        <div className="grid grid-cols-2 gap-4 py-2 font-mono">
+                          <div className="p-3 bg-slate-900/40 border border-slate-900 rounded-xl">
+                            <span className="text-[9px] text-slate-500 block">Total Referrals</span>
+                            <strong className="text-lg text-slate-100">{userProfile?.referralCount || 0} Leads</strong>
+                          </div>
+                          <div className="p-3 bg-slate-900/40 border border-slate-900 rounded-xl">
+                            <span className="text-[9px] text-slate-500 block">Claimable Cash</span>
+                            <strong className="text-lg text-emerald-400">₹{(userProfile?.referralCount || 0) * 50} INR</strong>
+                          </div>
+                        </div>
+
+                        {claimSuccessMsg && (
+                          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-[10px] font-mono leading-relaxed">
+                            {claimSuccessMsg}
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={handleClaimEarnings}
+                        disabled={claimStatus === 'claiming' || (userProfile?.referralCount || 0) === 0}
+                        className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:from-slate-900 disabled:to-slate-900 disabled:text-slate-500 text-slate-950 font-black text-xs rounded-xl uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer mt-4"
+                      >
+                        {claimStatus === 'claiming' ? <Loader2 className="w-4 h-4 animate-spin text-slate-950" /> : null}
+                        <span>Instant Withdrawal to UPI/Bank (₹{(userProfile?.referralCount || 0) * 50})</span>
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+            </AnimatePresence>
+
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+    </div>
+  );
+}

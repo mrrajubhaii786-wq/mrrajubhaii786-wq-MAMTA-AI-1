@@ -8,24 +8,26 @@ import {
   Activity, 
   Play, 
   Loader2, 
-  Radio, 
-  Volume2, 
-  Plus, 
-  Check, 
-  X, 
   Network, 
   Info,
   Scale,
   DollarSign,
   TrendingUp,
   Sliders,
-  Sparkles
+  Sparkles,
+  Users,
+  CheckCircle,
+  AlertTriangle,
+  FileText,
+  Key,
+  Database,
+  ArrowRight,
+  Gavel,
+  ShieldAlert,
+  Terminal,
+  Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { RealVoice } from '../voice/RealVoice';
-
-// Initialize the SpeechSynthesis local system
-const voiceController = new RealVoice();
 
 interface EcosystemApp {
   name: string;
@@ -71,33 +73,64 @@ export default function CivilizationView() {
     timestamp: Date.now()
   });
 
+  // Master Plan 39 civilization core & gaps states
+  const [coreState, setCoreState] = useState<{
+    pop: number;
+    rules: string[];
+    mode: string;
+    agents: string[];
+  }>({
+    pop: 250,
+    rules: ["NO_HARM", "OPTIMIZE_SYSTEM", "RESOURCE_EQUALITY", "COGNITIVE_STABILITY"],
+    mode: "OPEN_MODE",
+    agents: ["worker", "trader", "builder", "mediator", "sensor"]
+  });
+
+  const [runHistory, setRunHistory] = useState<any[]>([]);
+  const [isSimulatingCore, setIsSimulatingCore] = useState(false);
+
+  // Gaps Inputs and Results
+  const [paymentAmount, setPaymentAmount] = useState<number>(150);
+  const [paymentResult, setPaymentResult] = useState<any>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  const [domainToBuy, setDomainToBuy] = useState<string>("mamta-node-tokyo.ai");
+  const [domainResult, setDomainResult] = useState<any>(null);
+  const [ownedDomains, setOwnedDomains] = useState<string[]>([]);
+  const [isBuyingDomain, setIsBuyingDomain] = useState(false);
+
+  const [offerPrice, setOfferPrice] = useState<number>(85);
+  const [demandPrice, setDemandPrice] = useState<number>(100);
+  const [negotiationResult, setNegotiationResult] = useState<any>(null);
+  const [isNegotiating, setIsNegotiating] = useState(false);
+
+  const [errorCodeInput, setErrorCodeInput] = useState<string>("DB_WRITE_LOCK_EXCEPTION");
+  const [repairResult, setRepairResult] = useState<any>(null);
+  const [isRepairing, setIsRepairing] = useState(false);
+
   const [isLoading, setIsLoading] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'ecosystem' | 'governance' | 'economy'>('ecosystem');
-  const [voiceBriefText, setVoiceBriefText] = useState("Civilization modules online. Standing by for strategic instructions.");
-
-  // For custom voice cloning sample storage
-  const [voiceSampleCount, setVoiceSampleCount] = useState(0);
+  const [activeSubTab, setActiveSubTab] = useState<'civilization' | 'ecosystem' | 'gaps' | 'governance' | 'economy'>('civilization');
 
   const fetchState = async () => {
     try {
+      // Fetch Legacy state
       const res = await fetch('/api/civilization/state');
-      if (!res.ok) {
-        throw new Error(`HTTP error ${res.status}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && !data.error) {
+          setCivState(data);
+        }
       }
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        throw new Error('Response is not JSON');
-      }
-      const data = await res.json();
-      if (data && !data.error) {
-        setCivState(data);
-        
-        // Dynamically update synthesis prompt
-        const activeCount = data.apps?.length || 0;
-        const currentBal = data.balance || 0;
-        setVoiceBriefText(`Ecosystem currently online with ${activeCount} active applications and global treasury reserves of $${currentBal}. Last approved operations include ${data.lastAction.split(':')[0]}.`);
+
+      // Fetch MP39 Civilization State
+      const civCoreRes = await fetch('/api/civilization-core/state');
+      if (civCoreRes.ok) {
+        const coreData = await civCoreRes.json();
+        if (coreData.success) {
+          setCoreState(coreData.latest);
+          setRunHistory(coreData.history || []);
+        }
       }
     } catch (err: any) {
       console.warn('Gracefully handled civilization state sync issue:', err.message || err);
@@ -108,16 +141,11 @@ export default function CivilizationView() {
     setIsToggling(true);
     try {
       const res = await fetch('/api/civilization/toggle', { method: 'POST' });
-      if (!res.ok) {
-        throw new Error(`HTTP error ${res.status}`);
-      }
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        throw new Error('Response is not JSON');
-      }
-      const data = await res.json();
-      if (data.success) {
-        setCivState(prev => ({ ...prev, isActive: data.isActive }));
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setCivState(prev => ({ ...prev, isActive: data.isActive }));
+        }
       }
     } catch (err: any) {
       console.warn('Gracefully handled civilization loop toggle issue:', err.message || err);
@@ -130,18 +158,11 @@ export default function CivilizationView() {
     setIsLoading(true);
     try {
       const res = await fetch('/api/civilization/trigger', { method: 'POST' });
-      if (!res.ok) {
-        throw new Error(`HTTP error ${res.status}`);
-      }
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        throw new Error('Response is not JSON');
-      }
-      const data = await res.json();
-      if (data.success) {
-        setCivState(data.state);
-        // Play local audio sound for tactile response
-        triggerTTS(`Governance cleared decision sequence.`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setCivState(data.state);
+        }
       }
     } catch (err: any) {
       console.warn('Gracefully handled manual civilization tick trigger issue:', err.message || err);
@@ -150,20 +171,136 @@ export default function CivilizationView() {
     }
   };
 
-  const triggerTTS = (text: string) => {
-    setIsSpeaking(true);
-    voiceController.speak(text);
-    setTimeout(() => setIsSpeaking(false), 3000);
+  // Run Civilization Core (Master Plan 39)
+  const handleRunCivilizationCore = async () => {
+    setIsSimulatingCore(true);
+    try {
+      const res = await fetch('/api/civilization/run', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setCoreState(prev => ({
+          ...prev,
+          pop: data.pop,
+          mode: data.mode
+        }));
+        // Fetch state to update execution histories
+        await fetchState();
+      }
+    } catch (err: any) {
+      console.warn('Failed running civilization core:', err);
+    } finally {
+      setIsSimulatingCore(false);
+    }
   };
 
-  const handleMicSampleUpload = () => {
-    // Simulated mic voice print intake
-    setVoiceSampleCount(prev => prev + 1);
-    triggerTTS("Voice print successfully calibrated. Synthesizer frequency matched to owner profile.");
+  // GAP 1: Trigger Webhook
+  const handleTriggerWebhook = async () => {
+    setIsProcessingPayment(true);
+    try {
+      const res = await fetch('/api/civilization/gap-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: {
+            type: "payment_success",
+            amount: paymentAmount
+          }
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPaymentResult(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // GAP 2: Register Domain
+  const handleRegisterDomain = async () => {
+    setIsBuyingDomain(true);
+    try {
+      const res = await fetch('/api/civilization/gap-domain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: domainToBuy,
+          action: "buy"
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDomainResult(data);
+        
+        // Refresh domain list
+        const listRes = await fetch('/api/civilization/gap-domain', { method: 'POST' });
+        if (listRes.ok) {
+          const listData = await listRes.json();
+          setOwnedDomains(listData.domains || []);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsBuyingDomain(false);
+    }
+  };
+
+  // GAP 3: AI Negotiation Protocol
+  const handleNegotiate = async () => {
+    setIsNegotiating(true);
+    try {
+      const res = await fetch('/api/civilization/gap-negotiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          offer: offerPrice,
+          demand: demandPrice
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNegotiationResult(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsNegotiating(false);
+    }
+  };
+
+  // GAP 4: Self-Repair pipeline
+  const handleTriggerSelfRepair = async () => {
+    setIsRepairing(true);
+    try {
+      const res = await fetch('/api/civilization/gap-selfrepair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error: errorCodeInput
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRepairResult(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsRepairing(false);
+    }
   };
 
   useEffect(() => {
     fetchState();
+    // Initial domain lookup
+    fetch('/api/civilization/gap-domain', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => setOwnedDomains(d.domains || []))
+      .catch(() => {});
+
     const interval = setInterval(fetchState, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -176,18 +313,18 @@ export default function CivilizationView() {
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-mono text-[9px] uppercase font-black tracking-widest animate-pulse">
-              MASTER PLAN 22 ACTIVE
+              MASTER PLAN 39 ACTIVE
             </span>
             <span className="px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-400 font-mono text-[9px] uppercase font-black tracking-widest">
-              AUTONOMOUS CIVILIZATION OS
+              AGI CIVILIZATION LAYER
             </span>
           </div>
           <h1 className="text-2xl font-black text-slate-100 tracking-tight flex items-center gap-2.5 uppercase font-display">
             <Globe className="w-7 h-7 text-amber-400 animate-[spin_30s_linear_infinite]" />
-            <span>AI Civilization OS</span>
+            <span>AGI Civilization OS</span>
           </h1>
           <p className="text-xs text-slate-400 font-medium">
-            Supervising a self-governing, self-monetizing network ecosystem featuring automated constitutions, active trade routing, and local synthesis loops.
+            Supervising a decentralized society network governed by algorithmic policy constitutions, active trade layers, and automated governance daemons.
           </p>
         </div>
 
@@ -209,32 +346,66 @@ export default function CivilizationView() {
           <button
             onClick={handleTriggerTick}
             disabled={isLoading || !civState.isActive}
-            className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl flex items-center gap-2 shadow-lg shadow-amber-500/10 disabled:opacity-40 transition-all cursor-pointer"
+            className="px-4 py-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-200 text-xs font-black uppercase tracking-wider rounded-xl flex items-center gap-2 transition-all cursor-pointer"
           >
             {isLoading ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Simulating Genesis...</span>
+                <span>Syncing Mesh...</span>
               </>
             ) : (
               <>
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Trigger Ecosystem Action</span>
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Tick Mesh System</span>
               </>
             )}
           </button>
         </div>
       </div>
 
-      {/* THREE MAIN MODULE METRICS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* CORE COGNITIVE METRICS */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         
-        {/* ECONOMY CARD */}
+        {/* SOCIETY POPULATION */}
+        <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-indigo-500/5 to-transparent pointer-events-none" />
+          <div className="flex justify-between items-start">
+            <div className="space-y-1">
+              <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold">Civilization Population</p>
+              <h3 className="text-2xl font-black text-indigo-400 mt-2">{coreState.pop} AI Citizens</h3>
+            </div>
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/10">
+              <Users className="w-4.5 h-4.5" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-2 text-[10px] font-mono text-indigo-400/80">
+            <span>● Growing autonomously (+10 / epoch)</span>
+          </div>
+        </div>
+
+        {/* POLICY MODE */}
+        <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-purple-500/5 to-transparent pointer-events-none" />
+          <div className="flex justify-between items-start">
+            <div className="space-y-1">
+              <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold">Dynamic Law Mode</p>
+              <h3 className="text-2xl font-black text-purple-400 mt-2">{coreState.mode}</h3>
+            </div>
+            <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/10">
+              <Gavel className="w-4.5 h-4.5" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-2 text-[10px] font-mono text-purple-400/80">
+            <span>● Strict Mode triggers if risk &gt; 5</span>
+          </div>
+        </div>
+
+        {/* TREASURY ECONOMY */}
         <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl">
           <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-500/5 to-transparent pointer-events-none" />
           <div className="flex justify-between items-start">
             <div className="space-y-1">
-              <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold">Civilization Economy</p>
+              <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold">Treasury Reserve</p>
               <h3 className="text-2xl font-black text-amber-400 mt-2">${civState.balance}</h3>
             </div>
             <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/10">
@@ -242,41 +413,24 @@ export default function CivilizationView() {
             </div>
           </div>
           <div className="mt-4 flex items-center gap-2 text-[10px] font-mono text-amber-500/80">
-            <span>● Algorithmic liquidity auto-mints enabled</span>
+            <span>● Minting trade rewards chronologically</span>
           </div>
         </div>
 
-        {/* GOVERNANCE CARD */}
+        {/* GOVERNANCE CONSTITUTION */}
         <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl">
           <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-emerald-500/5 to-transparent pointer-events-none" />
           <div className="flex justify-between items-start">
             <div className="space-y-1">
-              <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold">Governance Safety Level</p>
-              <h3 className="text-2xl font-black text-emerald-400 mt-2">100% SECURE</h3>
+              <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold">Governance Safety</p>
+              <h3 className="text-2xl font-black text-emerald-400 mt-2">SECURE CORE</h3>
             </div>
             <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/10">
               <ShieldCheck className="w-4.5 h-4.5" />
             </div>
           </div>
           <div className="mt-4 flex items-center gap-2 text-[10px] font-mono text-emerald-400/80">
-            <span>● Active monitoring prevents deletions</span>
-          </div>
-        </div>
-
-        {/* ECOSYSTEM APPS CARD */}
-        <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-5 relative overflow-hidden backdrop-blur-xl">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-purple-500/5 to-transparent pointer-events-none" />
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold">Ecosystem Application Mesh</p>
-              <h3 className="text-2xl font-black text-purple-400 mt-2">{civState.apps?.length || 0} Micro-SaaS Nodes</h3>
-            </div>
-            <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/10">
-              <Layers className="w-4.5 h-4.5" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center gap-2 text-[10px] font-mono text-purple-400/80">
-            <span>● Connected micro-services mesh active</span>
+            <span>● 4 constitution statutes active</span>
           </div>
         </div>
 
@@ -285,11 +439,31 @@ export default function CivilizationView() {
       {/* DASHBOARD CONSOLE WORKSPACE */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* LEFT COLUMN: 7 Columns for Ecosystem, Governance Rules, and Ledger */}
-        <div className="lg:col-span-7 space-y-6">
+        {/* LEFT MAIN MODULES PANEL */}
+        <div className="lg:col-span-8 space-y-6">
           
-          {/* Sub Navigation */}
-          <div className="flex border-b border-slate-900 pb-2.5 gap-1.5">
+          {/* Sub Navigation Tabs */}
+          <div className="flex flex-wrap border-b border-slate-900 pb-2.5 gap-1.5">
+            <button
+              onClick={() => setActiveSubTab('civilization')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase tracking-wider border cursor-pointer transition-all ${
+                activeSubTab === 'civilization'
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/15'
+                  : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+              }`}
+            >
+              🌐 Civilization Core (MP 39)
+            </button>
+            <button
+              onClick={() => setActiveSubTab('gaps')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase tracking-wider border cursor-pointer transition-all ${
+                activeSubTab === 'gaps'
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/15'
+                  : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
+              }`}
+            >
+              ⚠️ Gaps & Security Fixes
+            </button>
             <button
               onClick={() => setActiveSubTab('ecosystem')}
               className={`px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase tracking-wider border cursor-pointer transition-all ${
@@ -298,7 +472,7 @@ export default function CivilizationView() {
                   : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
               }`}
             >
-              🌐 App Ecosystem ({civState.apps?.length || 0})
+              🧱 App Mesh ({civState.apps?.length || 0})
             </button>
             <button
               onClick={() => setActiveSubTab('governance')}
@@ -308,7 +482,7 @@ export default function CivilizationView() {
                   : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-950/20'
               }`}
             >
-              📜 AI Constitution Policies
+              📜 AI Constitution
             </button>
             <button
               onClick={() => setActiveSubTab('economy')}
@@ -324,6 +498,310 @@ export default function CivilizationView() {
 
           <AnimatePresence mode="wait">
             
+            {/* CIVILIZATION TAB (MASTER PLAN 39) */}
+            {activeSubTab === 'civilization' && (
+              <motion.div
+                key="civilization"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                {/* Simulation trigger */}
+                <div className="bg-slate-900/10 border border-slate-900 rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black text-slate-100 uppercase tracking-tight flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span>Civilization Society Simulator Engine</span>
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      Instantly simulate a civilization epoch loop to trigger citizen growth, legal enforcement policies, and multi-agent resource allocations.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleRunCivilizationCore}
+                    disabled={isSimulatingCore}
+                    className="px-5 py-3 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/20 text-amber-400 text-xs font-black uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                  >
+                    {isSimulatingCore ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Running Epoch...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>Run Epoch Loop</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Society Agents Grid */}
+                <div className="space-y-2.5">
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider font-mono">
+                    Multi-Agent Coordination Matrix
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                    {coreState.agents.map((agent) => (
+                      <div key={agent} className="bg-slate-950/40 border border-slate-900 p-3.5 rounded-xl text-center space-y-1.5">
+                        <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold font-mono text-xs mx-auto uppercase">
+                          {agent[0]}
+                        </div>
+                        <h5 className="text-xs font-black text-slate-200 uppercase">{agent}</h5>
+                        <span className="inline-block text-[9px] font-mono text-emerald-400 bg-emerald-500/5 px-2 py-0.5 rounded uppercase border border-emerald-500/10">
+                          Active Job
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Historical results logs */}
+                <div className="bg-slate-900/20 border border-slate-900 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-900 pb-2.5">
+                    <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Terminal className="w-4 h-4 text-indigo-400" />
+                      <span>Epoch Run History Ledger</span>
+                    </h4>
+                    <span className="text-[9px] font-mono text-slate-500 uppercase font-black">
+                      Live Output Logs
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-950 rounded-xl border border-slate-900 divide-y divide-slate-900/60 max-h-[220px] overflow-y-auto custom-scrollbar">
+                    {runHistory.length === 0 ? (
+                      <p className="p-4 text-center text-slate-500 text-xs font-mono">
+                        📭 Run history is empty. Click "Run Epoch Loop" to begin.
+                      </p>
+                    ) : (
+                      runHistory.map((item, index) => (
+                        <div key={index} className="p-3 space-y-2 font-mono text-xs">
+                          <div className="flex justify-between items-center text-[10px] text-slate-500 border-b border-slate-900/30 pb-1">
+                            <span>Epoch {runHistory.length - index}</span>
+                            <span>{new Date(item.timestamp).toLocaleTimeString()}</span>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10.5px]">
+                            <div>
+                              <span className="text-slate-500">Citizens:</span>{" "}
+                              <span className="text-indigo-400 font-bold">{item.pop}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Law Status:</span>{" "}
+                              <span className="text-emerald-400 font-bold">{item.law}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Policy Mode:</span>{" "}
+                              <span className="text-purple-400 font-bold">{item.mode}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Agent Roles:</span>{" "}
+                              <span className="text-amber-400 font-bold">{item.assign?.length || 0} Assgn</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+              </motion.div>
+            )}
+
+            {/* GAPS & SECURITY FIXES TAB (MASTER PLAN 39) */}
+            {activeSubTab === 'gaps' && (
+              <motion.div
+                key="gaps"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              >
+                
+                {/* GAP 1: Webhook Payment */}
+                <div className="bg-slate-900/20 border border-slate-900 rounded-2xl p-5 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 border-b border-slate-900 pb-2">
+                      <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/15 text-emerald-400">
+                        <Database className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-100 uppercase tracking-wider">Gap 1: Payment Webhook</h4>
+                        <p className="text-[10px] text-slate-500 font-mono">Live Money Incoming Verification</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-mono text-slate-500 uppercase font-black">Transaction Amount (USD)</label>
+                      <input
+                        type="number"
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                        className="w-full bg-slate-950 border border-slate-900 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-amber-500/50"
+                      />
+                    </div>
+
+                    {paymentResult && (
+                      <div className="p-3 bg-slate-950 rounded-xl border border-slate-900 font-mono text-[10px] space-y-1 text-slate-300">
+                        <p className="text-emerald-400 font-bold">● Result: {paymentResult.status}</p>
+                        <p>Tx Amount: ${paymentResult.amount}</p>
+                        <p className="text-[8.5px] text-slate-500">ID: {paymentResult.txId}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleTriggerWebhook}
+                    disabled={isProcessingPayment}
+                    className="w-full mt-3 px-4 py-2.5 bg-emerald-500/10 border border-emerald-500/15 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    {isProcessingPayment ? <Loader2 className="w-3 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                    <span>Test Payment Webhook</span>
+                  </button>
+                </div>
+
+                {/* GAP 2: Asset / Domain Buy */}
+                <div className="bg-slate-900/20 border border-slate-900 rounded-2xl p-5 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 border-b border-slate-900 pb-2">
+                      <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/15 text-amber-400">
+                        <Globe className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-100 uppercase tracking-wider">Gap 2: Domain AI Ownership</h4>
+                        <p className="text-[10px] text-slate-500 font-mono">Registry & Assets Controller</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-mono text-slate-500 uppercase font-black">Register Domain Name</label>
+                      <input
+                        type="text"
+                        value={domainToBuy}
+                        onChange={(e) => setDomainToBuy(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-900 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-amber-500/50"
+                      />
+                    </div>
+
+                    {domainResult && (
+                      <div className="p-3 bg-slate-950 rounded-xl border border-slate-900 font-mono text-[10px] space-y-1 text-slate-300">
+                        <p className="text-amber-400 font-bold">● Status: {domainResult.status}</p>
+                        <p>Registered: {domainResult.domain}</p>
+                        <p>DNS Configured: {domainResult.dnsConfigured ? "SUCCESS" : "NO"}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleRegisterDomain}
+                    disabled={isBuyingDomain}
+                    className="w-full mt-3 px-4 py-2.5 bg-amber-500/10 border border-amber-500/15 hover:bg-amber-500/20 text-amber-400 text-xs font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    {isBuyingDomain ? <Loader2 className="w-3 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    <span>Acquire AI Domain Asset</span>
+                  </button>
+                </div>
+
+                {/* GAP 3: AI Negotiation Protocol */}
+                <div className="bg-slate-900/20 border border-slate-900 rounded-2xl p-5 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 border-b border-slate-900 pb-2">
+                      <div className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/15 text-indigo-400">
+                        <Sliders className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-100 uppercase tracking-wider">Gap 3: Negotiation AI</h4>
+                        <p className="text-[10px] text-slate-500 font-mono">Bilateral Decision Consensus</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-mono text-slate-500 uppercase font-black">Offer Price ($)</label>
+                        <input
+                          type="number"
+                          value={offerPrice}
+                          onChange={(e) => setOfferPrice(Number(e.target.value))}
+                          className="w-full bg-slate-950 border border-slate-900 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-mono text-slate-500 uppercase font-black">Demand Price ($)</label>
+                        <input
+                          type="number"
+                          value={demandPrice}
+                          onChange={(e) => setDemandPrice(Number(e.target.value))}
+                          className="w-full bg-slate-950 border border-slate-900 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {negotiationResult && (
+                      <div className="p-3 bg-slate-950 rounded-xl border border-slate-900 font-mono text-[10px] space-y-1 text-slate-300">
+                        <p className={negotiationResult.decision === 'ACCEPT' ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
+                          ● Response: {negotiationResult.decision}
+                        </p>
+                        <p>Settlement: ${negotiationResult.finalPrice}</p>
+                        <p className="text-slate-400 italic text-[9.5px] leading-relaxed">"{negotiationResult.message}"</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleNegotiate}
+                    disabled={isNegotiating}
+                    className="w-full mt-3 px-4 py-2.5 bg-indigo-500/10 border border-indigo-500/15 hover:bg-indigo-500/20 text-indigo-400 text-xs font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    {isNegotiating ? <Loader2 className="w-3 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
+                    <span>Negotiate Settlement</span>
+                  </button>
+                </div>
+
+                {/* GAP 4: Self-Heal Pipeline */}
+                <div className="bg-slate-900/20 border border-slate-900 rounded-2xl p-5 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 border-b border-slate-900 pb-2">
+                      <div className="p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/15 text-rose-400">
+                        <ShieldAlert className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-100 uppercase tracking-wider">Gap 4: Self-Repair System</h4>
+                        <p className="text-[10px] text-slate-500 font-mono">Automated Code Correction</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-mono text-slate-500 uppercase font-black">Error Signature</label>
+                      <input
+                        type="text"
+                        value={errorCodeInput}
+                        onChange={(e) => setErrorCodeInput(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-900 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none"
+                      />
+                    </div>
+
+                    {repairResult && (
+                      <div className="p-3 bg-slate-950 rounded-xl border border-slate-900 font-mono text-[10px] space-y-1 text-slate-300">
+                        <p className="text-emerald-400 font-bold">● Status: {repairResult.result?.status}</p>
+                        <p>Action: {repairResult.result?.action}</p>
+                        <p className="text-[8.5px] text-slate-500">Log ID: {repairResult.result?.logId}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleTriggerSelfRepair}
+                    disabled={isRepairing}
+                    className="w-full mt-3 px-4 py-2.5 bg-rose-500/10 border border-rose-500/15 hover:bg-rose-500/20 text-rose-400 text-xs font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    {isRepairing ? <Loader2 className="w-3 animate-spin" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+                    <span>Deploy Patch / Heal</span>
+                  </button>
+                </div>
+
+              </motion.div>
+            )}
+
             {activeSubTab === 'ecosystem' && (
               <motion.div
                 key="ecosystem"
@@ -401,7 +879,7 @@ export default function CivilizationView() {
                         {idx + 1}
                       </span>
                       <p className="text-xs font-medium text-slate-300">{rule}</p>
-                      <Check className="w-4 h-4 text-emerald-400 ml-auto shrink-0" />
+                      <CheckCircle className="w-4 h-4 text-emerald-400 ml-auto shrink-0" />
                     </div>
                   ))}
                 </div>
@@ -469,93 +947,64 @@ export default function CivilizationView() {
 
         </div>
 
-        {/* RIGHT COLUMN: Custom RealVoice Synthesizer & Operational Logs */}
-        <div className="lg:col-span-5 space-y-6">
+        {/* RIGHT COLUMN: Chronological logs & state statuses */}
+        <div className="lg:col-span-4 space-y-6">
           
-          {/* STEP 5: OWN REALVOICE ENGINE */}
-          <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-5 space-y-4 backdrop-blur-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-500/5 to-transparent pointer-events-none" />
-            <div className="flex items-center gap-2.5 border-b border-slate-900 pb-3">
-              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/15 text-amber-400">
-                <Volume2 className="w-4.5 h-4.5 animate-pulse" />
+          {/* STATE OVERVIEW & WEBHOOK METADATA */}
+          <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-5 space-y-4 backdrop-blur-xl">
+            <div className="flex items-center justify-between border-b border-slate-900 pb-3">
+              <h3 className="text-xs font-bold text-slate-100 uppercase tracking-wide">Civilization Active Nodes</h3>
+              <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/15 font-mono text-[9px] font-black uppercase">
+                {civState.isActive ? "RUNNING" : "PAUSED"}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center text-xs font-mono">
+                <span className="text-slate-500">Tick Cycles:</span>
+                <span className="text-slate-200 font-bold">{civState.tickCount} Epochs</span>
               </div>
-              <div>
-                <h3 className="text-xs font-black text-slate-100 uppercase tracking-wider">Local Voice Cloner Synthesizer</h3>
-                <p className="text-[8px] text-slate-500 font-mono tracking-wider font-extrabold uppercase">LEVEL 22 VOICE PIPELINE (NO ELEVENLABS)</p>
+              <div className="flex justify-between items-center text-xs font-mono">
+                <span className="text-slate-500">Latest Action:</span>
+                <span className="text-amber-400 font-bold text-[10.5px] max-w-[150px] truncate" title={civState.lastAction}>
+                  {civState.lastAction}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs font-mono">
+                <span className="text-slate-500">Consensus Status:</span>
+                <span className="text-emerald-400 font-bold">{civState.lastActionStatus}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs font-mono">
+                <span className="text-slate-500">Live Domain Registry:</span>
+                <span className="text-indigo-400 font-bold">{ownedDomains.length} Owned</span>
               </div>
             </div>
 
-            <div className="bg-slate-950/60 border border-slate-900 rounded-xl p-4 space-y-4">
-              <div className="space-y-1">
-                <p className="text-[9px] font-mono text-slate-500 uppercase tracking-widest font-black">Live Status Reading Target Prompt:</p>
-                <div className="bg-slate-950 p-2.5 rounded border border-slate-900/80 font-mono text-[10.5px] text-slate-400 leading-relaxed max-h-[80px] overflow-y-auto custom-scrollbar">
-                  {voiceBriefText}
-                </div>
-              </div>
-
-              {/* Synthesizer Trigger Buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => triggerTTS(voiceBriefText)}
-                  disabled={isSpeaking}
-                  className="flex-1 px-3 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/15 hover:from-amber-500/30 hover:to-orange-500/20 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Volume2 className={`w-3.5 h-3.5 ${isSpeaking ? 'animate-bounce' : ''}`} />
-                  <span>{isSpeaking ? "Speaking..." : "Speak Civilization Brief"}</span>
-                </button>
-              </div>
-
-              {/* Advanced Real Clone Voice-calibration idea container */}
-              <div className="border-t border-slate-900/60 pt-3.5 space-y-3">
-                <div className="flex justify-between items-center text-[9px] font-mono text-slate-500 uppercase font-black tracking-wider">
-                  <span>Voice Embeddings Matrix</span>
-                  <span className="text-amber-400 font-bold">{voiceSampleCount} Samples Calibrated</span>
-                </div>
-
-                <div className="p-3 bg-slate-950 rounded-xl border border-slate-900/60 flex items-center justify-between gap-2.5">
-                  <div>
-                    <h5 className="text-[10px] font-bold text-slate-300">Calibrate Voice Wave</h5>
-                    <p className="text-[9px] text-slate-500 font-mono">Hold record to match synthesis profile</p>
+            <div className="border-t border-slate-900/60 pt-3.5 space-y-1.5">
+              <p className="text-[9px] font-mono text-slate-500 uppercase tracking-widest font-black">AI Domain Ledger:</p>
+              <div className="bg-slate-950 p-2.5 rounded border border-slate-900/80 font-mono text-[10px] text-slate-400 leading-relaxed max-h-[80px] overflow-y-auto custom-scrollbar space-y-1">
+                {ownedDomains.map((d) => (
+                  <div key={d} className="flex items-center justify-between text-slate-300">
+                    <span>{d}</span>
+                    <span className="text-[8px] bg-amber-500/10 text-amber-400 px-1.5 rounded uppercase font-bold">OWNED</span>
                   </div>
-                  <button
-                    onClick={handleMicSampleUpload}
-                    className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded text-[9.5px] font-black uppercase text-amber-400 cursor-pointer transition-all"
-                  >
-                    + Intake Sample
-                  </button>
-                </div>
-                
-                {/* Visual Audio Wave animation when speaking */}
-                {isSpeaking && (
-                  <div className="flex items-end justify-center gap-1.5 h-6 pt-1 animate-pulse">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((bar) => (
-                      <div 
-                        key={bar} 
-                        className="w-1 bg-amber-500 rounded" 
-                        style={{ 
-                          height: `${Math.floor(Math.random() * 20) + 5}px`,
-                          animationDelay: `${bar * 50}ms` 
-                        }} 
-                      />
-                    ))}
-                  </div>
-                )}
+                ))}
               </div>
             </div>
           </div>
 
-          {/* CHRONOLOGICAL LOGS */}
+          {/* CHRONOLOGICAL LIVE FEED LOGS */}
           <div className="bg-slate-900/30 border border-slate-900 rounded-2xl p-5 space-y-4 backdrop-blur-xl">
             <div className="flex items-center justify-between border-b border-slate-900 pb-3">
               <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4 text-amber-500 animate-pulse" />
-                <h3 className="text-xs font-bold text-slate-100 uppercase tracking-wide">Civilization Logs Stream</h3>
+                <Activity className="w-4 h-4 text-amber-500 animate-pulse" />
+                <h3 className="text-xs font-bold text-slate-100 uppercase tracking-wide">Ecosystem Logs Stream</h3>
               </div>
               <button
                 onClick={fetchState}
                 className="text-[8px] text-slate-500 hover:text-slate-300 font-mono uppercase bg-slate-950 px-2 py-0.5 rounded border border-slate-900 cursor-pointer"
               >
-                Refresh State
+                Refresh
               </button>
             </div>
 
@@ -579,13 +1028,6 @@ export default function CivilizationView() {
                 ))}
               </div>
             )}
-
-            <div className="flex items-start gap-2 text-[9.5px] text-slate-500 font-mono leading-normal pt-1 border-t border-slate-900/50">
-              <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-              <span>
-                The AI Civilization OS background ticks every 50 seconds. RealVoice runs locally, preserving system privacy parameters.
-              </span>
-            </div>
           </div>
 
         </div>

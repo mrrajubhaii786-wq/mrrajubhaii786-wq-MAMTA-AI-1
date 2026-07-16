@@ -27,7 +27,9 @@ import {
   Database,
   Code,
   Compass,
-  Brain
+  Brain,
+  Network,
+  Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -49,12 +51,20 @@ import EvolutionView from './components/EvolutionView';
 import ConsciousnessView from './components/ConsciousnessView';
 import MetaIntelligenceView from './components/MetaIntelligenceView';
 import SystemGovernorView from './components/SystemGovernorView';
+import UnifiedCoreView from './components/UnifiedCoreView';
+import DistributedCoreView from './components/DistributedCoreView';
+import GlobalNetworkView from './components/GlobalNetworkView';
+import ExecutionLayerView from './components/ExecutionLayerView';
+import HumanIntegrationView from './components/HumanIntegrationView';
+import EcosystemLayerView from './components/EcosystemLayerView';
+import EconomicLayerView from './components/EconomicLayerView';
 import { MamtaBrainReal } from './brain/MamtaBrainReal';
 import Toast from './components/Toast';
+import SaasPlatformView from './components/SaasPlatformView';
 
 export default function App() {
   const [brain] = useState(() => new MamtaBrainReal());
-  const [activeTab, setActiveTab] = useState<'home' | 'workspace' | 'admin' | 'safedrop' | 'launch' | 'empire' | 'civilization' | 'world' | 'universe' | 'multiverse' | 'agi' | 'will' | 'evolution' | 'consciousness' | 'meta-intelligence' | 'system-governor'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'workspace' | 'admin' | 'safedrop' | 'launch' | 'saas' | 'empire' | 'civilization' | 'world' | 'universe' | 'multiverse' | 'agi' | 'will' | 'evolution' | 'consciousness' | 'meta-intelligence' | 'system-governor' | 'unified-core' | 'distributed-core' | 'global-network' | 'execution-layer' | 'human-layer' | 'ecosystem-layer' | 'economic-layer'>('home');
   const [sessionId, setSessionId] = useState('');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -246,6 +256,19 @@ export default function App() {
             </button>
 
             <button
+              id="nav_link_saas_platform"
+              onClick={() => { setActiveTab('saas'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'saas' 
+                  ? 'bg-gradient-to-r from-cyan-500/10 to-teal-500/5 text-cyan-400 border border-cyan-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5 shrink-0 text-cyan-400 animate-[pulse_2s_infinite]" />
+              <span className="font-bold text-cyan-400">🏆 MAMTA SaaS Startup</span>
+            </button>
+
+            <button
               id="nav_link_empire"
               onClick={() => { setActiveTab('empire'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
@@ -387,6 +410,98 @@ export default function App() {
               <Shield className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
               <span>AGI System Governor</span>
             </button>
+
+            <button
+              id="nav_link_unified_core"
+              onClick={() => { setActiveTab('unified-core'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'unified-core' 
+                  ? 'bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
+              <span>AGI Unified Core</span>
+            </button>
+
+            <button
+              id="nav_link_distributed_core"
+              onClick={() => { setActiveTab('distributed-core'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'distributed-core' 
+                  ? 'bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
+              <span>AGI Distributed Brain</span>
+            </button>
+
+            <button
+              id="nav_link_global_network"
+              onClick={() => { setActiveTab('global-network'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'global-network' 
+                  ? 'bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Network className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
+              <span>AGI Global Network</span>
+            </button>
+
+            <button
+              id="nav_link_execution_layer"
+              onClick={() => { setActiveTab('execution-layer'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'execution-layer' 
+                  ? 'bg-gradient-to-r from-amber-500/15 to-indigo-500/15 text-amber-400 border border-amber-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+              <span>AGI Execution Layer</span>
+            </button>
+
+            <button
+              id="nav_link_human_layer"
+              onClick={() => { setActiveTab('human-layer'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'human-layer' 
+                  ? 'bg-gradient-to-r from-amber-500/15 to-indigo-500/15 text-amber-400 border border-amber-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Brain className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+              <span>AGI Human Layer</span>
+            </button>
+
+            <button
+              id="nav_link_ecosystem_layer"
+              onClick={() => { setActiveTab('ecosystem-layer'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'ecosystem-layer' 
+                  ? 'bg-gradient-to-r from-indigo-500/15 to-purple-500/15 text-indigo-400 border border-indigo-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5 shrink-0 text-indigo-400" />
+              <span>AGI Ecosystem Layer</span>
+            </button>
+
+            <button
+              id="nav_link_economic_layer"
+              onClick={() => { setActiveTab('economic-layer'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'economic-layer' 
+                  ? 'bg-gradient-to-r from-amber-500/15 to-amber-600/15 text-amber-400 border border-amber-500/15 shadow-inner' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 border border-transparent'
+              }`}
+            >
+              <Coins className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+              <span>AGI Economic Layer</span>
+            </button>
+
 
 
             <button
@@ -531,6 +646,16 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => { setActiveTab('saas'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'saas' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Cpu className="w-4 h-4 text-cyan-400" />
+                <span className="font-bold">🏆 MAMTA SaaS Startup</span>
+              </button>
+
+              <button
                 onClick={() => { setActiveTab('empire'); setMobileMenuOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
                   activeTab === 'empire' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15' : 'text-slate-400'
@@ -639,6 +764,77 @@ export default function App() {
                 <Shield className="w-4 h-4 text-cyan-400" />
                 <span>AGI System Governor</span>
               </button>
+
+              <button
+                onClick={() => { setActiveTab('unified-core'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'unified-core' ? 'bg-[#06b6d4]/10 text-cyan-400 border border-[#06b6d4]/15' : 'text-slate-400'
+                }`}
+              >
+                <Cpu className="w-4 h-4 text-cyan-400" />
+                <span>AGI Unified Core</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('distributed-core'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'distributed-core' ? 'bg-[#06b6d4]/10 text-cyan-400 border border-[#06b6d4]/15' : 'text-slate-400'
+                }`}
+              >
+                <Globe className="w-4 h-4 text-cyan-400" />
+                <span>AGI Distributed Brain</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('global-network'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'global-network' ? 'bg-[#06b6d4]/10 text-cyan-400 border border-[#06b6d4]/15' : 'text-slate-400'
+                }`}
+              >
+                <Network className="w-4 h-4 text-cyan-400" />
+                <span>AGI Global Network</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('execution-layer'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'execution-layer' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Zap className="w-4 h-4 text-amber-400" />
+                <span>AGI Execution Layer</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('human-layer'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'human-layer' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Brain className="w-4 h-4 text-amber-400" />
+                <span>AGI Human Layer</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('ecosystem-layer'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'ecosystem-layer' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Globe className="w-4 h-4 text-indigo-400" />
+                <span>AGI Ecosystem Layer</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('economic-layer'); setMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold ${
+                  activeTab === 'economic-layer' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/15' : 'text-slate-400'
+                }`}
+              >
+                <Coins className="w-4 h-4 text-amber-400" />
+                <span>AGI Economic Layer</span>
+              </button>
+
 
 
               <button
@@ -781,6 +977,9 @@ export default function App() {
               {activeTab === 'launch' && (
                 <LaunchHubView sessionId={sessionId} />
               )}
+              {activeTab === 'saas' && (
+                <SaasPlatformView sessionId={sessionId} />
+              )}
               {activeTab === 'empire' && (
                 <EmpireView />
               )}
@@ -814,6 +1013,28 @@ export default function App() {
               {activeTab === 'system-governor' && (
                 <SystemGovernorView />
               )}
+              {activeTab === 'unified-core' && (
+                <UnifiedCoreView />
+              )}
+              {activeTab === 'distributed-core' && (
+                <DistributedCoreView />
+              )}
+              {activeTab === 'global-network' && (
+                <GlobalNetworkView />
+              )}
+              {activeTab === 'execution-layer' && (
+                <ExecutionLayerView />
+              )}
+              {activeTab === 'human-layer' && (
+                <HumanIntegrationView />
+              )}
+              {activeTab === 'ecosystem-layer' && (
+                <EcosystemLayerView />
+              )}
+              {activeTab === 'economic-layer' && (
+                <EconomicLayerView />
+              )}
+
 
             </motion.div>
           </AnimatePresence>

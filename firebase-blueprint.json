@@ -64,6 +64,48 @@
         "time": { "type": "integer" }
       },
       "required": ["input", "output", "time"]
+    },
+    "SaaSUser": {
+      "title": "SaaSUser",
+      "description": "Multi-tenant user profile for the MAMTA AI SaaS Startup platform",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "plan": { "type": "string", "enum": ["FREE", "PRO", "PREMIUM"] },
+        "limit": { "type": "integer" },
+        "usage": { "type": "integer" },
+        "credits": { "type": "integer" },
+        "country": { "type": "string" },
+        "verified": { "type": "boolean" }
+      },
+      "required": ["email", "plan", "limit", "usage", "credits", "country", "verified"]
+    },
+    "SaaSProject": {
+      "title": "SaaSProject",
+      "description": "User generated websites and landing pages",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "userId": { "type": "string" },
+        "prompt": { "type": "string" },
+        "html": { "type": "string" },
+        "isDeployed": { "type": "boolean" },
+        "subdomain": { "type": "string" },
+        "createdAt": { "type": "integer" }
+      },
+      "required": ["projectId", "userId", "prompt", "html", "isDeployed", "createdAt"]
+    },
+    "SaaSAnalytics": {
+      "title": "SaaSAnalytics",
+      "description": "Platform global event tracking metric log",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "metadata": { "type": "string" },
+        "createdAt": { "type": "integer" }
+      },
+      "required": ["userId", "action", "createdAt"]
     }
   },
   "firestore": {
@@ -86,6 +128,18 @@
     "/memory/{memoryId}": {
       "schema": "Memory",
       "description": "Collection of learning memory records"
+    },
+    "/saas_users/{email}": {
+      "schema": "SaaSUser",
+      "description": "Multi-tenant SaaS startup users with tier limit configurations and payment settings"
+    },
+    "/saas_projects/{projectId}": {
+      "schema": "SaaSProject",
+      "description": "User generated SaaS landing pages and custom websites"
+    },
+    "/saas_analytics/{analyticsId}": {
+      "schema": "SaaSAnalytics",
+      "description": "Activity analytics log of platform-wide user operations and builds"
     }
   }
 }
